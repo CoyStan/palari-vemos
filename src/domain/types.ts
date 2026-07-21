@@ -38,6 +38,8 @@ export type Recurrence =
   | 'biweekly'
   | 'daily';
 
+export type InviteTone = 'warm' | 'casual' | 'playful';
+
 export type Friend = {
   id: string;
   name: string;
@@ -81,6 +83,11 @@ export type PlanFriend = {
   friendId: string;
   status: InviteStatus;
   invitationText: string;
+  inviteTone: InviteTone;
+  invitationCustomized: boolean;
+  sentAt: string | null;
+  /** Preserved when a friend is deleted from completed history. */
+  displayNameSnapshot: string | null;
 };
 
 export type Plan = {
@@ -97,11 +104,11 @@ export type Plan = {
   /** After-the-moment capture, filled once the plan is done. */
   memoryNote: string;
   memoryPhotoUri: string | null;
+  completedAt: string | null;
+  cancelledAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
-
-export type InviteTone = 'warm' | 'casual' | 'playful';
 
 export type AppSettings = {
   notificationsEnabled: boolean;
@@ -118,9 +125,12 @@ export type AppSettings = {
   calendarDayStartHour: number;
   /** Exclusive end hour for week/day calendar (1–24). Display only. */
   calendarDayEndHour: number;
+  /** When false, reminder notifications stay generic on the lock screen. */
+  showReminderNames: boolean;
 };
 
 export type AppData = {
+  schemaVersion: number;
   onboardingComplete: boolean;
   friends: Friend[];
   availability: AvailabilityRule[];
@@ -142,14 +152,15 @@ export type ConcreteSlot = {
 
 export const defaultSettings = (): AppSettings => ({
   notificationsEnabled: false,
-  notifyFreeSlots: true,
+  notifyFreeSlots: false,
   notifyCatchUpDue: true,
-  notifyWaitingFollowUp: true,
+  notifyWaitingFollowUp: false,
   notifyPlanTomorrow: true,
   notifyAskIfHappened: true,
-  defaultDurationMinutes: 120,
+  defaultDurationMinutes: 60,
   firstDayOfWeek: 1,
   timeFormat24h: false,
   calendarDayStartHour: 7,
   calendarDayEndHour: 22,
+  showReminderNames: false,
 });

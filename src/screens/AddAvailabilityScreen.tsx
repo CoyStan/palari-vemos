@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Button } from '../components/Button';
@@ -25,23 +25,74 @@ const PRESETS: { id: PresetId; label: string; hint: string }[] = [
   { id: 'oneoff', label: 'One-time slot', hint: 'A single free window' },
 ];
 
-export function AddAvailabilityScreen() {
-  const { addAvailability, goBack, data } = useApp();
+type Props = {
+  mode?: 'create' | 'edit';
+};
+
+export function AddAvailabilityScreen(_props: Props = {}) {
+  const {
+    addAvailability,
+    updateAvailability,
+    goBack,
+    data,
+    activeAvailabilityId,
+    screen,
+  } = useApp();
+  const mode: 'create' | 'edit' = screen === 'editAvailability' ? 'edit' : 'create';
+  void _props;
   const today = formatDateKey(new Date());
   const timeFormat24h = data.settings.timeFormat24h;
+  const existing = mode === 'edit'
+    ? data.availability.find((rule) => rule.id === activeAvailabilityId) ?? null
+    : null;
 
-  const [preset, setPreset] = useState<PresetId>('weeknights');
-  const [daysOfWeek, setDaysOfWeek] = useState<number[]>([1, 2, 3, 4]);
-  const [startMinutes, setStartMinutes] = useState(19 * 60);
-  const [endMinutes, setEndMinutes] = useState(22 * 60);
-  const [recurrence, setRecurrence] = useState<Recurrence>('weekly');
-  const [oneOffDate, setOneOffDate] = useState(today);
-  const [label, setLabel] = useState('');
+  const initial = useMemo(() => {
+    if (existing) {
+      return {
+        kind: existing.kind as AvailabilityKind,
+        preset: (existing.kind === 'oneoff' ? 'oneoff' : 'custom') as PresetId,
+        daysOfWeek: existing.daysOfWeek,
+        startMinutes: existing.startMinutes,
+        endMinutes: existing.endMinutes,
+        recurrence: existing.recurrence,
+        oneOffDate: existing.oneOffDate ?? today,
+        label: existing.label,
+      };
+    }
+    return {
+      kind: 'recurring' as AvailabilityKind,
+      preset: 'weeknights' as PresetId,
+      daysOfWeek: [1, 2, 3, 4],
+      startMinutes: 19 * 60,
+      endMinutes: 22 * 60,
+      recurrence: 'weekly' as Recurrence,
+      oneOffDate: today,
+      label: 'Weeknights',
+    };
+  }, [existing, today]);
+
+  const [kind, setKind] = useState<AvailabilityKind>(initial.kind);
+  const [preset, setPreset] = useState<PresetId>(initial.preset);
+  const [daysOfWeek, setDaysOfWeek] = useState<number[]>(initial.daysOfWeek);
+  const [startMinutes, setStartMinutes] = useState(initial.startMinutes);
+  const [endMinutes, setEndMinutes] = useState(initial.endMinutes);
+  const [recurrence, setRecurrence] = useState<Recurrence>(initial.recurrence);
+  const [oneOffDate, setOneOffDate] = useState(initial.oneOffDate);
+  const [label, setLabel] = useState(initial.label);
   const [saving, setSaving] = useState(false);
 
   const applyPreset = (id: PresetId) => {
     hapticTick();
     setPreset(id);
+    if (id === 'oneoff') {
+      setKind('oneoff');
+      setLabel((current) => current || 'One-time');
+      setStartMinutes(16 * 60);
+      setEndMinutes(18 * 60);
+      setDaysOfWeek([]);
+      return;
+    }
+    setKind('recurring');
     if (id === 'weeknights') {
       setDaysOfWeek([1, 2, 3, 4]);
       setStartMinutes(19 * 60);
@@ -66,10 +117,6 @@ export function AddAvailabilityScreen() {
       setEndMinutes(13 * 60);
       setRecurrence('weekly');
       setLabel('Sunday brunch');
-    } else if (id === 'oneoff') {
-      setLabel('One-time');
-      setStartMinutes(16 * 60);
-      setEndMinutes(18 * 60);
     } else {
       setLabel('');
     }
@@ -84,15 +131,13 @@ export function AddAvailabilityScreen() {
   };
 
   const onTimeChange = (which: 'start' | 'end', minutes: number) => {
-    setPreset('custom');
-    if (which === 'start') {
-      setStartMinutes(minutes);
-    } else {
-      setEndMinutes(minutes);
+    // Time edits never change kind — only mark recurring presets as customized.
+    if (kind === 'recurring' && preset !== 'custom' && preset !== 'oneoff') {
+      setPreset('custom');
     }
+    if (which === 'start') setStartMinutes(minutes);
+    else setEndMinutes(minutes);
   };
-
-  const kind: AvailabilityKind = preset === 'oneoff' ? 'oneoff' : 'recurring';
 
   const onSave = async () => {
     if (endMinutes <= startMinutes) {
@@ -103,20 +148,25 @@ export function AddAvailabilityScreen() {
       Alert.alert('Pick a day', 'Choose at least one day of the week.');
       return;
     }
+    const payload = {
+      kind,
+      label: label.trim() || (kind === 'oneoff' ? "You're free" : 'Free time'),
+      daysOfWeek: kind === 'oneoff' ? [] : daysOfWeek,
+      startMinutes,
+      endMinutes,
+      recurrence,
+      startDate: kind === 'oneoff' ? oneOffDate : today,
+      endDate: null,
+      oneOffDate: kind === 'oneoff' ? oneOffDate : null,
+      enabled: existing?.enabled ?? true,
+    };
     setSaving(true);
     try {
-      await addAvailability({
-        kind,
-        label: label.trim() || (kind === 'oneoff' ? 'You\'re free' : 'Free time'),
-        daysOfWeek: kind === 'oneoff' ? [] : daysOfWeek,
-        startMinutes,
-        endMinutes,
-        recurrence,
-        startDate: kind === 'oneoff' ? oneOffDate : today,
-        endDate: null,
-        oneOffDate: kind === 'oneoff' ? oneOffDate : null,
-        enabled: true,
-      });
+      if (mode === 'edit' && existing) {
+        await updateAvailability(existing.id, payload);
+      } else {
+        await addAvailability(payload);
+      }
     } finally {
       setSaving(false);
     }
@@ -124,9 +174,12 @@ export function AddAvailabilityScreen() {
 
   return (
     <Screen contentClassName="gap-6">
-      <ScreenHeader title="When are you free?" onBack={goBack} />
+      <ScreenHeader
+        title={mode === 'edit' ? 'Edit free time' : 'When are you free?'}
+        onBack={goBack}
+      />
       <Text className="text-body text-muted">
-        Pick a preset, then tap the time fields to fine-tune.
+        Pick a preset, then tap the time fields to fine-tune. Changing times keeps one-time slots one-time.
       </Text>
 
       <ScrollView
@@ -142,26 +195,14 @@ export function AddAvailabilityScreen() {
             accessibilityLabel={`${item.label}: ${item.hint}`}
             onPress={() => applyPreset(item.id)}
             className={cn(
-              'min-w-[120px] items-center justify-center rounded-card px-4 py-3',
-              preset === item.id
-                ? 'bg-primary'
-                : 'bg-surface border border-border',
+              'min-h-[48px] min-w-[120px] items-center justify-center rounded-card px-4 py-3',
+              preset === item.id ? 'bg-primary' : 'border border-border bg-surface',
             )}
           >
-            <Text
-              className={cn(
-                'font-sans-bold text-body',
-                preset === item.id ? 'text-white' : 'text-ink',
-              )}
-            >
+            <Text className={cn('font-sans-bold text-body', preset === item.id ? 'text-white' : 'text-ink')}>
               {item.label}
             </Text>
-            <Text
-              className={cn(
-                'mt-0.5 text-caption',
-                preset === item.id ? 'text-white/80' : 'text-muted',
-              )}
-            >
+            <Text className={cn('mt-0.5 text-caption', preset === item.id ? 'text-white/80' : 'text-muted')}>
               {item.hint}
             </Text>
           </Pressable>
@@ -170,7 +211,7 @@ export function AddAvailabilityScreen() {
 
       {kind === 'recurring' ? (
         <View className="gap-2">
-          <Text className="text-caption font-sans-semibold text-ink">Days</Text>
+          <Text accessibilityRole="header" className="text-caption font-sans-semibold text-ink">Days</Text>
           <View className="flex-row flex-wrap gap-2">
             {DAY_LABELS.map((dayLabel, index) => {
               const selected = daysOfWeek.includes(index);
@@ -183,15 +224,10 @@ export function AddAvailabilityScreen() {
                   onPress={() => toggleDay(index)}
                   className={cn(
                     'h-12 w-12 items-center justify-center rounded-full',
-                    selected ? 'bg-primary' : 'bg-surface border border-border',
+                    selected ? 'bg-primary' : 'border border-border bg-surface',
                   )}
                 >
-                  <Text
-                    className={cn(
-                      'text-center font-sans-bold text-caption leading-5',
-                      selected ? 'text-white' : 'text-ink',
-                    )}
-                  >
+                  <Text className={cn('text-center font-sans-bold text-caption leading-5', selected ? 'text-white' : 'text-ink')}>
                     {dayLabel}
                   </Text>
                 </Pressable>
@@ -202,11 +238,7 @@ export function AddAvailabilityScreen() {
       ) : null}
 
       {kind === 'oneoff' ? (
-        <DateSlotPicker
-          label="Date"
-          date={oneOffDate}
-          onChange={setOneOffDate}
-        />
+        <DateSlotPicker label="Date" date={oneOffDate} onChange={setOneOffDate} />
       ) : null}
 
       <Card className="gap-3">
@@ -244,10 +276,10 @@ export function AddAvailabilityScreen() {
                 accessibilityState={{ selected: recurrence === id }}
                 onPress={() => { hapticTick(); setRecurrence(id); }}
                 className={cn(
-                  'flex-1 min-h-[44px] items-center justify-center rounded-full',
+                  'min-h-[48px] flex-1 items-center justify-center rounded-full',
                   recurrence === id
-                    ? 'bg-primary-soft border border-primary'
-                    : 'bg-surface border border-border',
+                    ? 'border border-primary bg-primary-soft'
+                    : 'border border-border bg-surface',
                 )}
               >
                 <Text className={cn('text-center font-sans-semibold text-caption leading-5', recurrence === id ? 'text-primary' : 'text-ink')}>
@@ -266,7 +298,11 @@ export function AddAvailabilityScreen() {
         placeholder="e.g. Friday night"
       />
 
-      <Button label="Save availability" loading={saving} onPress={() => void onSave()} />
+      <Button
+        label={mode === 'edit' ? 'Save changes' : 'Save availability'}
+        loading={saving}
+        onPress={() => void onSave()}
+      />
     </Screen>
   );
 }

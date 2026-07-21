@@ -46,6 +46,20 @@ export function startOfDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
+/**
+ * UTC calendar ordinal (days since Unix epoch UTC midnight).
+ * Safe across DST when both dates are normalized via local startOfDay first,
+ * then compared in UTC-year-month-day space.
+ */
+export function utcCalendarOrdinal(date: Date): number {
+  return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000);
+}
+
+/** Whole calendar days between two local calendar dates (DST-safe). */
+export function calendarDaysBetween(from: Date, to: Date): number {
+  return utcCalendarOrdinal(startOfDay(to)) - utcCalendarOrdinal(startOfDay(from));
+}
+
 export function startOfWeek(date: Date, firstDayOfWeek = 0): Date {
   const result = startOfDay(date);
   const diff = (result.getDay() - firstDayOfWeek + 7) % 7;
@@ -69,9 +83,7 @@ export function daysSince(isoDate: string | null, now = new Date()): number | nu
   if (!isoDate) {
     return null;
   }
-  const then = startOfDay(new Date(isoDate));
-  const today = startOfDay(now);
-  return Math.max(0, Math.floor((today.getTime() - then.getTime()) / 86400000));
+  return Math.max(0, calendarDaysBetween(new Date(isoDate), now));
 }
 
 export function formatDayHeading(date: Date): string {

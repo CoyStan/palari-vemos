@@ -9,34 +9,33 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { AnimatedDialog } from '../components/AnimatedDialog';
+import { Avatar } from '../components/Avatar';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Screen } from '../components/Screen';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { TextField } from '../components/TextField';
 import {
-  buildInviteText,
   formatClock,
   INVITE_STATUS_LABELS,
   PLAN_STATUS_LABELS,
   SHARE_OPTIONS,
 } from '../domain/model';
-import type { InviteStatus, InviteTone, PlanStatus } from '../domain/types';
+import type { InviteStatus, InviteTone } from '../domain/types';
 import { formatDayHeading } from '../domain/time';
 import { hapticCelebrate, hapticSoft, hapticTick } from '../services/haptics';
 import { useApp } from '../state/AppProvider';
 import { useReduceMotion } from '../ui/useReduceMotion';
 import { cn } from '../ui/cn';
 
-const STATUS_OPTIONS: InviteStatus[] = [
-  'not_invited',
-  'waiting',
-  'yes',
-  'maybe',
-  'no',
-  'new_time',
-  'moved',
+const RESPONSE_CHOICES: { status: InviteStatus; label: string }[] = [
+  { status: 'yes', label: 'Yes' },
+  { status: 'maybe', label: 'Maybe' },
+  { status: 'no', label: 'Can’t make it' },
+  { status: 'new_time', label: 'Suggest another time' },
 ];
+
+const LABEL_STATUSES: InviteStatus[] = ['not_invited', 'waiting', 'moved'];
 
 const TONE_OPTIONS: { value: InviteTone; label: string }[] = [
   { value: 'warm', label: 'Warm' },
@@ -48,10 +47,15 @@ export function PlanDetailScreen() {
   const {
     activePlan,
     data,
+    now,
     goBack,
     updatePlan,
     shareInvite,
     setFriendInviteStatus,
+    updateInvitationText,
+    resetInvitationSuggested,
+    confirmInviteSent,
+    markPlanDone,
     markPlanStatus,
     savePlanMemory,
     openMoveFriend,
@@ -63,14 +67,19 @@ export function PlanDetailScreen() {
   const [place, setPlace] = useState('');
   const [note, setNote] = useState('');
   const [inviteDrafts, setInviteDrafts] = useState<Record<string, string>>({});
-  const [inviteTones, setInviteTones] = useState<Record<string, InviteTone>>({});
-  const [statusFriendId, setStatusFriendId] = useState<string | null>(null);
+  const [editingInvite, setEditingInvite] = useState<Record<string, boolean>>({});
+  const [styleFriendId, setStyleFriendId] = useState<string | null>(null);
   const [confirmFriendId, setConfirmFriendId] = useState<string | null>(null);
+  const [planDetailsOpen, setPlanDetailsOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [doneFutureOpen, setDoneFutureOpen] = useState(false);
+  const [attendanceOpen, setAttendanceOpen] = useState(false);
+  const [attendedIds, setAttendedIds] = useState<string[]>([]);
   const [memoryOpen, setMemoryOpen] = useState(false);
   const [memoryNote, setMemoryNote] = useState('');
   const [memoryPhoto, setMemoryPhoto] = useState<string | null>(null);
 
-  const prevStatus = useRef<PlanStatus | null>(null);
+  const prevStatus = useRef<string | null>(null);
   const bloom = useSharedValue(0);
 
   useEffect(() => {
@@ -85,7 +94,6 @@ export function PlanDetailScreen() {
       Object.fromEntries(activePlan.friends.map((item) => [item.friendId, item.invitationText])),
     );
 
-    // Celebrate the moment a plan turns on (someone said yes).
     const prev = prevStatus.current;
     prevStatus.current = activePlan.status;
     if (prev && prev !== 'on' && activePlan.status === 'on') {
@@ -114,8 +122,12 @@ export function PlanDetailScreen() {
   }
 
   const start = new Date(activePlan.startAt);
+  const end = new Date(activePlan.endAt);
   const startMin = start.getHours() * 60 + start.getMinutes();
+  const endMin = end.getHours() * 60 + end.getMinutes();
   const isDone = activePlan.status === 'done';
+  const isCancelled = activePlan.status === 'cancelled';
+  const planFriends = activePlan.friends.filter((item) => item.status !== 'moved');
 
   const saveDetails = () => {
     void updatePlan({ title, activity, place, note });
@@ -138,28 +150,60 @@ export function PlanDetailScreen() {
     void setFriendInviteStatus(friendId, status);
   };
 
-  const onPickTone = (friendId: string, friendName: string, tone: InviteTone) => {
-    hapticTick();
-    setInviteTones((current) => ({ ...current, [friendId]: tone }));
-    setInviteDrafts((current) => ({
-      ...current,
-      [friendId]: buildInviteText({
-        name: friendName,
-        startAt: activePlan.startAt,
-        activity,
-        place,
-        timeFormat24h: data.settings.timeFormat24h,
-        tone,
-      }),
-    }));
+  const saveInviteText = (friendId: string) => {
+    const text = inviteDrafts[friendId];
+    if (text === undefined) return;
+    void updateInvitationText(friendId, text);
+    setEditingInvite((current) => ({ ...current, [friendId]: false }));
   };
 
-  const onMarkDone = async () => {
-    await markPlanStatus('done');
+  const onPickTone = (friendId: string, tone: InviteTone) => {
+    hapticTick();
+    void resetInvitationSuggested(friendId, tone);
+    setStyleFriendId(null);
+  };
+
+  const openAttendancePicker = () => {
+    const preselected = activePlan.friends
+      .filter((item) => item.status === 'yes')
+      .map((item) => item.friendId);
+    setAttendedIds(preselected);
+    setAttendanceOpen(true);
+  };
+
+  const onMarkDonePress = () => {
+    if (end.getTime() > now.getTime()) {
+      setDoneFutureOpen(true);
+      return;
+    }
+    openAttendancePicker();
+  };
+
+  const onConfirmDoneFuture = () => {
+    setDoneFutureOpen(false);
+    openAttendancePicker();
+  };
+
+  const onConfirmAttendance = async () => {
+    await markPlanDone(attendedIds);
     hapticCelebrate();
+    setAttendanceOpen(false);
     setMemoryNote(activePlan.memoryNote);
     setMemoryPhoto(activePlan.memoryPhotoUri);
     setMemoryOpen(true);
+  };
+
+  const onConfirmCancel = async () => {
+    setCancelOpen(false);
+    await markPlanStatus('cancelled');
+  };
+
+  const toggleAttended = (friendId: string) => {
+    setAttendedIds((current) => (
+      current.includes(friendId)
+        ? current.filter((id) => id !== friendId)
+        : [...current, friendId]
+    ));
   };
 
   const onPickMemoryPhoto = async () => {
@@ -184,16 +228,33 @@ export function PlanDetailScreen() {
     ? data.friends.find((entry) => entry.id === confirmFriendId) ?? null
     : null;
 
+  const styleFriend = styleFriendId
+    ? data.friends.find((entry) => entry.id === styleFriendId) ?? null
+    : null;
+
   return (
     <Screen contentClassName="gap-5">
       <ScreenHeader title="Plan" onBack={goBack} />
 
       <Animated.View style={bloomStyle}>
-        <Card elevation="lift" className="gap-1 p-5">
+        <Card elevation="lift" className="gap-3 p-5">
           <Text className="font-sans-semibold text-caption text-muted">
             {formatDayHeading(start)} · {formatClock(startMin, data.settings.timeFormat24h)}
+            {' – '}
+            {formatClock(endMin, data.settings.timeFormat24h)}
           </Text>
-          <Text className="font-sans-bold text-title text-ink">{activePlan.title}</Text>
+          <View className="flex-row flex-wrap items-center gap-2">
+            {planFriends.map((item) => {
+              const friend = data.friends.find((entry) => entry.id === item.friendId);
+              const name = friend?.name ?? item.displayNameSnapshot ?? 'Friend';
+              return (
+                <View key={item.friendId} className="flex-row items-center gap-2 rounded-full bg-canvas px-2 py-1">
+                  <Avatar name={name} photoUri={friend?.photoUri} size={28} />
+                  <Text className="font-sans-semibold text-caption text-ink">{name}</Text>
+                </View>
+              );
+            })}
+          </View>
           <Text className="text-body text-primary">{PLAN_STATUS_LABELS[activePlan.status]}</Text>
         </Card>
       </Animated.View>
@@ -235,80 +296,97 @@ export function PlanDetailScreen() {
         </Card>
       ) : (
         <>
-          <TextField label="Title" value={title} onChangeText={setTitle} onBlur={saveDetails} />
-          <TextField label="Activity" value={activity} onChangeText={setActivity} onBlur={saveDetails} />
-          <TextField label="Place" value={place} onChangeText={setPlace} onBlur={saveDetails} />
-          <TextField label="Note" value={note} onChangeText={setNote} onBlur={saveDetails} />
-
           <View className="gap-3">
             <Text className="font-sans-bold text-section text-ink">Invitations</Text>
-            {activePlan.friends.map((item) => {
-              if (item.status === 'moved') {
-                return null;
-              }
+            {planFriends.map((item) => {
               const friend = data.friends.find((entry) => entry.id === item.friendId);
               if (!friend) {
                 return null;
               }
               const draft = inviteDrafts[item.friendId] ?? item.invitationText;
-              const tone = inviteTones[item.friendId] ?? 'warm';
+              const isEditing = editingInvite[item.friendId] ?? false;
+              const showStatusLabel = LABEL_STATUSES.includes(item.status);
+
               return (
                 <Card key={item.friendId} className="gap-3 p-4">
                   <View className="flex-row items-center justify-between gap-2">
                     <Text className="font-sans-bold text-body text-ink">{friend.name}</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`Change status for ${friend.name}`}
-                      onPress={() => setStatusFriendId(item.friendId)}
-                      className="min-h-[36px] items-center justify-center rounded-full bg-primary-soft px-3 active:bg-primary-softBorder"
-                    >
-                      <Text className="text-center text-caption font-sans-semibold leading-5 text-primary">
+                    {showStatusLabel ? (
+                      <Text className="text-caption font-sans-semibold text-muted">
                         {INVITE_STATUS_LABELS[item.status]}
                       </Text>
-                    </Pressable>
+                    ) : null}
                   </View>
 
-                  <View className="flex-row flex-wrap gap-2">
-                    {TONE_OPTIONS.map((option) => {
-                      const selected = tone === option.value;
-                      return (
-                        <Pressable
-                          key={option.value}
-                          accessibilityRole="button"
-                          accessibilityState={{ selected }}
-                          accessibilityLabel={`${option.label} tone`}
-                          onPress={() => onPickTone(item.friendId, friend.name, option.value)}
-                          className={cn(
-                            'min-h-[36px] items-center justify-center rounded-full px-3',
-                            selected ? 'bg-primary-soft' : 'bg-canvas',
-                          )}
-                        >
-                          <Text
-                            className={cn(
-                              'text-center text-caption font-sans-semibold leading-5',
-                              selected ? 'text-primary' : 'text-muted',
-                            )}
-                          >
-                            {option.label}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
+                  {isEditing ? (
+                    <TextField
+                      label="Invitation"
+                      value={draft}
+                      onChangeText={(text) => {
+                        setInviteDrafts((current) => ({ ...current, [item.friendId]: text }));
+                      }}
+                      onBlur={() => saveInviteText(item.friendId)}
+                      multiline
+                      className="min-h-[96px]"
+                    />
+                  ) : (
+                    <View className="gap-2">
+                      <Text className="text-body text-ink">{draft}</Text>
+                      <Button
+                        label="Edit message"
+                        variant="secondary"
+                        onPress={() => setEditingInvite((current) => ({ ...current, [item.friendId]: true }))}
+                      />
+                    </View>
+                  )}
 
-                  <TextField
-                    label="Invitation"
-                    value={draft}
-                    onChangeText={(text) => {
-                      setInviteDrafts((current) => ({ ...current, [item.friendId]: text }));
-                    }}
-                    multiline
-                    className="min-h-[96px]"
+                  <Button
+                    label="Change style"
+                    variant="ghost"
+                    onPress={() => setStyleFriendId(item.friendId)}
                   />
+
                   <Button
                     label={`Share via ${SHARE_OPTIONS.find((option) => option.value === friend.shareMethod)?.label ?? 'share'} with ${friend.name}`}
                     onPress={() => void onShare(item.friendId, draft)}
                   />
+
+                  <View className="gap-2">
+                    <Text className="text-caption font-sans-semibold text-ink">Response</Text>
+                    <View className="flex-row flex-wrap gap-2">
+                      {RESPONSE_CHOICES.map((choice) => {
+                        const selected = item.status === choice.status;
+                        return (
+                          <Pressable
+                            key={choice.status}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected }}
+                            accessibilityLabel={choice.label}
+                            onPress={() => onSetStatus(item.friendId, choice.status)}
+                            className={cn(
+                              'min-h-[36px] items-center justify-center rounded-full border px-3',
+                              selected ? 'border-primary bg-primary-soft' : 'border-border bg-canvas',
+                            )}
+                          >
+                            <Text
+                              className={cn(
+                                'text-center text-caption font-sans-semibold leading-5',
+                                selected ? 'text-primary' : 'text-ink',
+                              )}
+                            >
+                              {choice.label}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                    {!showStatusLabel && !RESPONSE_CHOICES.some((choice) => choice.status === item.status) ? (
+                      <Text className="text-caption text-muted">
+                        {INVITE_STATUS_LABELS[item.status]}
+                      </Text>
+                    ) : null}
+                  </View>
+
                   {item.status === 'new_time' ? (
                     <Button
                       label="Move to another plan"
@@ -320,87 +398,177 @@ export function PlanDetailScreen() {
               );
             })}
           </View>
+
+          <View className="gap-2">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: planDetailsOpen }}
+              accessibilityLabel="Plan details"
+              onPress={() => setPlanDetailsOpen((open) => !open)}
+              className="min-h-[44px] flex-row items-center justify-between rounded-control border border-border bg-surface px-4 py-3"
+            >
+              <Text className="font-sans-semibold text-body text-ink">Plan details</Text>
+              <Text className="text-caption text-muted">{planDetailsOpen ? 'Hide' : 'Show'}</Text>
+            </Pressable>
+            {planDetailsOpen ? (
+              <View className="gap-3">
+                <TextField label="Title" value={title} onChangeText={setTitle} onBlur={saveDetails} />
+                <TextField label="Activity" value={activity} onChangeText={setActivity} onBlur={saveDetails} />
+                <TextField label="Place" value={place} onChangeText={setPlace} onBlur={saveDetails} />
+                <TextField
+                  label="Private note"
+                  value={note}
+                  onChangeText={setNote}
+                  onBlur={saveDetails}
+                  placeholder="Just for you"
+                />
+              </View>
+            ) : null}
+          </View>
         </>
       )}
 
-      <View className="gap-2">
-        <Text className="font-sans-bold text-section text-ink">Plan</Text>
-        {!isDone ? (
-          <Button label="Mark done" onPress={() => void onMarkDone()} />
-        ) : null}
-        {!isDone ? (
-          <Button label="Cancel plan" variant="ghost" onPress={() => void markPlanStatus('cancelled')} />
-        ) : null}
-      </View>
+      {!isDone && !isCancelled ? (
+        <View className="gap-2">
+          <Button label="Mark done" onPress={onMarkDonePress} />
+          <Button label="Cancel plan" variant="ghost" onPress={() => setCancelOpen(true)} />
+        </View>
+      ) : null}
 
       <AnimatedDialog
-        visible={statusFriendId !== null}
-        onClose={() => setStatusFriendId(null)}
-        accessibilityLabel="Update reply"
+        visible={styleFriendId !== null}
+        onClose={() => setStyleFriendId(null)}
+        accessibilityLabel="Change invitation style"
       >
         <View className="gap-1 px-5 pb-4">
           <Text className="mb-2 font-sans-bold text-section text-ink">
-            How did they reply?
+            Change style for {styleFriend?.name ?? 'them'}
           </Text>
-          {STATUS_OPTIONS.filter((status) => status !== 'moved').map((status) => (
+          {TONE_OPTIONS.map((option) => (
             <Pressable
-              key={status}
+              key={option.value}
               accessibilityRole="button"
-              accessibilityLabel={INVITE_STATUS_LABELS[status]}
+              accessibilityLabel={`${option.label} tone`}
               onPress={() => {
-                if (statusFriendId) {
-                  onSetStatus(statusFriendId, status);
+                if (styleFriendId) {
+                  onPickTone(styleFriendId, option.value);
                 }
-                setStatusFriendId(null);
               }}
-              className={cn(
-                'min-h-[48px] justify-center border-b border-border py-3 active:bg-primary-soft',
-              )}
+              className="min-h-[48px] justify-center border-b border-border py-3 active:bg-primary-soft"
             >
-              <Text className="text-body text-ink">{INVITE_STATUS_LABELS[status]}</Text>
+              <Text className="text-body text-ink">{option.label}</Text>
             </Pressable>
           ))}
-          {statusFriendId ? (
-            <Button
-              className="mt-4"
-              label="Move to another plan"
-              variant="secondary"
-              onPress={() => {
-                openMoveFriend(statusFriendId);
-                setStatusFriendId(null);
-              }}
-            />
-          ) : null}
         </View>
       </AnimatedDialog>
 
       <AnimatedDialog
         visible={confirmFriendId !== null}
         onClose={() => setConfirmFriendId(null)}
-        accessibilityLabel="Mark as invited"
+        accessibilityLabel="Confirm invitation sent"
       >
         <View className="gap-3 px-5 pb-4">
-          <Text className="font-sans-bold text-section text-ink">
-            Mark {confirmFriend?.name ?? 'them'} as invited?
-          </Text>
+          <Text className="font-sans-bold text-section text-ink">Did you send it?</Text>
           <Text className="text-body text-muted">
-            Android can’t always tell if the message was sent. Mark them as
-            waiting so you remember who you’re expecting a reply from.
+            Android can’t always tell if the message went through. Let us know so we can track
+            {' '}
+            {confirmFriend?.name ?? 'their'}
+            {' '}
+            reply.
           </Text>
           <Button
-            label="Mark waiting"
+            label="Yes, I sent it"
             onPress={() => {
               if (confirmFriendId) {
-                onSetStatus(confirmFriendId, 'waiting');
+                void confirmInviteSent(confirmFriendId, true);
               }
               setConfirmFriendId(null);
             }}
           />
           <Button
-            label="Not now"
+            label="Not yet"
             variant="ghost"
-            onPress={() => setConfirmFriendId(null)}
+            onPress={() => {
+              if (confirmFriendId) {
+                void confirmInviteSent(confirmFriendId, false);
+              }
+              setConfirmFriendId(null);
+            }}
           />
+        </View>
+      </AnimatedDialog>
+
+      <AnimatedDialog
+        visible={cancelOpen}
+        onClose={() => setCancelOpen(false)}
+        accessibilityLabel="Cancel plan"
+      >
+        <View className="gap-3 px-5 pb-4">
+          <Text className="font-sans-bold text-section text-ink">Cancel this plan?</Text>
+          <Text className="text-body text-muted">
+            This keeps it in your history as cancelled. You can always make a new invitation later.
+          </Text>
+          <Button label="Cancel plan" variant="ghost" onPress={() => void onConfirmCancel()} />
+          <Button label="Keep plan" onPress={() => setCancelOpen(false)} />
+        </View>
+      </AnimatedDialog>
+
+      <AnimatedDialog
+        visible={doneFutureOpen}
+        onClose={() => setDoneFutureOpen(false)}
+        accessibilityLabel="Mark future plan done"
+      >
+        <View className="gap-3 px-5 pb-4">
+          <Text className="font-sans-bold text-section text-ink">Mark done already?</Text>
+          <Text className="text-body text-muted">
+            This plan is still in the future. Mark it done only if it already happened or won’t happen as planned.
+          </Text>
+          <Button label="Mark done" onPress={onConfirmDoneFuture} />
+          <Button label="Not yet" variant="ghost" onPress={() => setDoneFutureOpen(false)} />
+        </View>
+      </AnimatedDialog>
+
+      <AnimatedDialog
+        visible={attendanceOpen}
+        onClose={() => setAttendanceOpen(false)}
+        accessibilityLabel="Who attended"
+      >
+        <View className="gap-3 px-5 pb-4">
+          <Text className="font-sans-bold text-section text-ink">Who made it?</Text>
+          <Text className="text-body text-muted">
+            We’ll update last-seen for the people you select.
+          </Text>
+          {planFriends.map((item) => {
+            const friend = data.friends.find((entry) => entry.id === item.friendId);
+            if (!friend) return null;
+            const selected = attendedIds.includes(item.friendId);
+            return (
+              <Pressable
+                key={item.friendId}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: selected }}
+                accessibilityLabel={friend.name}
+                onPress={() => toggleAttended(item.friendId)}
+                className={cn(
+                  'min-h-[48px] flex-row items-center gap-3 rounded-control border px-3',
+                  selected ? 'border-primary bg-primary-soft' : 'border-border bg-surface',
+                )}
+              >
+                <Avatar name={friend.name} photoUri={friend.photoUri} size={36} />
+                <Text className="flex-1 font-sans-semibold text-body text-ink">{friend.name}</Text>
+                <View
+                  className={cn(
+                    'h-5 w-5 items-center justify-center rounded border',
+                    selected ? 'border-primary bg-primary' : 'border-border',
+                  )}
+                >
+                  {selected ? <Text className="text-[10px] text-primary-text">✓</Text> : null}
+                </View>
+              </Pressable>
+            );
+          })}
+          <Button label="Save" onPress={() => void onConfirmAttendance()} />
+          <Button label="Cancel" variant="ghost" onPress={() => setAttendanceOpen(false)} />
         </View>
       </AnimatedDialog>
 

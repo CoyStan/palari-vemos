@@ -17,7 +17,7 @@ export const color = {
   softTeal: '#E7F5F4',
   softTealBorder: '#B7E0DD',
   coral: '#F28C78',
-  coralDeep: '#C96B5A',
+  coralDeep: '#A94C3E',
   softCoral: '#FFF0EC',
   softCoralBorder: '#F5C4B8',
   success: '#15803D',

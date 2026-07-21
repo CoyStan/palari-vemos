@@ -29,6 +29,7 @@ export function CreatePlanScreen() {
   const [step, setStep] = useState<'friends' | 'details'>(
     selectedFriendIds.length > 0 ? 'details' : 'friends',
   );
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [activity, setActivity] = useState('');
   const [customActivity, setCustomActivity] = useState('');
   const [place, setPlace] = useState('');
@@ -66,12 +67,15 @@ export function CreatePlanScreen() {
   const onCreate = async () => {
     setSaving(true);
     try {
-      await createPlan({
+      const result = await createPlan({
         title,
         activity: resolvedActivity,
         place,
         note,
       });
+      if (!result.ok) {
+        Alert.alert('Could not create invitation', result.message ?? 'Something went wrong. Try again.');
+      }
     } finally {
       setSaving(false);
     }
@@ -88,7 +92,7 @@ export function CreatePlanScreen() {
           <Text className="text-caption font-sans-semibold text-primary">{slotLabel}</Text>
         </View>
         <Text className="text-caption text-muted">
-          {step === 'friends' ? 'Step 1 of 2 · Pick your people' : 'Step 2 of 2 · Make it yours'}
+          {step === 'friends' ? 'Step 1 of 2 · Pick your people' : 'Step 2 of 2 · Ready to invite'}
         </Text>
       </View>
 
@@ -141,69 +145,95 @@ export function CreatePlanScreen() {
         </>
       ) : (
         <>
-          <TextField
-            label="Title (optional)"
-            value={title}
-            onChangeText={setTitle}
-            placeholder="Catch up with…"
-          />
+          <Card className="gap-2 p-4">
+            <Text className="text-body text-ink">
+              {selectedFriendIds.length === 1
+                ? `You’ll invite ${sortedFriends.find((f) => f.id === selectedFriendIds[0])?.name ?? 'one friend'}.`
+                : `You’ll invite ${selectedFriendIds.length} people.`}
+            </Text>
+            <Text className="text-caption text-muted">
+              You can edit the message and share from the next screen.
+            </Text>
+          </Card>
 
-          <View className="gap-2">
-            <Text className="text-caption font-sans-semibold text-ink">Activity (optional)</Text>
-            <View className="flex-row flex-wrap gap-2">
-              {ACTIVITY_OPTIONS.map((option) => {
-                const selected = activity === option;
-                return (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: detailsOpen }}
+            accessibilityLabel="Add a detail"
+            onPress={() => setDetailsOpen((open) => !open)}
+            className="min-h-[44px] flex-row items-center justify-between rounded-control border border-border bg-surface px-4 py-3"
+          >
+            <Text className="font-sans-semibold text-body text-ink">Add a detail</Text>
+            <Text className="text-caption text-muted">{detailsOpen ? 'Hide' : 'Show'}</Text>
+          </Pressable>
+
+          {detailsOpen ? (
+            <View className="gap-3">
+              <TextField
+                label="Title (optional)"
+                value={title}
+                onChangeText={setTitle}
+                placeholder="Catch up with…"
+              />
+
+              <View className="gap-2">
+                <Text className="text-caption font-sans-semibold text-ink">Activity (optional)</Text>
+                <View className="flex-row flex-wrap gap-2">
+                  {ACTIVITY_OPTIONS.map((option) => {
+                    const selected = activity === option;
+                    return (
+                      <Pressable
+                        key={option}
+                        onPress={() => setActivity(selected ? '' : option)}
+                        className={cn(
+                          'min-h-[44px] items-center justify-center rounded-full border px-4',
+                          selected ? 'border-primary bg-primary-soft' : 'border-border bg-surface',
+                        )}
+                      >
+                        <Text className={cn('text-center font-sans-semibold text-caption leading-5', selected ? 'text-primary' : 'text-ink')}>
+                          {option}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
                   <Pressable
-                    key={option}
-                    onPress={() => setActivity(selected ? '' : option)}
+                    onPress={() => setActivity(activity === 'custom' ? '' : 'custom')}
                     className={cn(
                       'min-h-[44px] items-center justify-center rounded-full border px-4',
-                      selected ? 'border-primary bg-primary-soft' : 'border-border bg-surface',
+                      activity === 'custom' ? 'border-primary bg-primary-soft' : 'border-border bg-surface',
                     )}
                   >
-                    <Text className={cn('text-center font-sans-semibold text-caption leading-5', selected ? 'text-primary' : 'text-ink')}>
-                      {option}
+                    <Text className={cn('text-center font-sans-semibold text-caption leading-5', activity === 'custom' ? 'text-primary' : 'text-ink')}>
+                      custom
                     </Text>
                   </Pressable>
-                );
-              })}
-              <Pressable
-                onPress={() => setActivity(activity === 'custom' ? '' : 'custom')}
-                className={cn(
-                  'min-h-[44px] items-center justify-center rounded-full border px-4',
-                  activity === 'custom' ? 'border-primary bg-primary-soft' : 'border-border bg-surface',
-                )}
-              >
-                <Text className={cn('text-center font-sans-semibold text-caption leading-5', activity === 'custom' ? 'text-primary' : 'text-ink')}>
-                  custom
-                </Text>
-              </Pressable>
-            </View>
-            {activity === 'custom' ? (
+                </View>
+                {activity === 'custom' ? (
+                  <TextField
+                    label="Custom activity"
+                    value={customActivity}
+                    onChangeText={setCustomActivity}
+                    placeholder="Board games"
+                  />
+                ) : null}
+              </View>
+
               <TextField
-                label="Custom activity"
-                value={customActivity}
-                onChangeText={setCustomActivity}
-                placeholder="Board games"
+                label="Place (optional)"
+                value={place}
+                onChangeText={setPlace}
+                placeholder="Bar Central"
               />
-            ) : null}
-          </View>
+              <TextField
+                label="Private note (optional)"
+                value={note}
+                onChangeText={setNote}
+                placeholder="Just for you — not shared"
+              />
+            </View>
+          ) : null}
 
-          <TextField
-            label="Place (optional)"
-            value={place}
-            onChangeText={setPlace}
-            placeholder="Bar Central"
-          />
-          <TextField
-            label="Note (optional)"
-            value={note}
-            onChangeText={setNote}
-            placeholder="Bring the photo album"
-          />
-
-          <Button label="Create plan" loading={saving} onPress={() => void onCreate()} />
+          <Button label="Create invitation" loading={saving} onPress={() => void onCreate()} />
         </>
       )}
     </Screen>

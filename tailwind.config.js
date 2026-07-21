@@ -24,7 +24,7 @@ module.exports = {
           DEFAULT: '#F28C78',
           soft: '#FFF0EC',
           softBorder: '#F5C4B8',
-          deep: '#C96B5A',
+          deep: '#A94C3E',
         },
         success: {
           DEFAULT: '#15803D',
