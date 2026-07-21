@@ -8,27 +8,49 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { BackHandler, Share } from 'react-native';
+import { AppState, BackHandler } from 'react-native';
 
+import {
+  addAvailabilityRule,
+  completeOnboardingState,
+  createPlanState,
+  deleteAvailabilityRule,
+  lookAroundFirst,
+  markInviteSentState,
+  markPlanCancelledState,
+  markPlanDoneState,
+  removeFriend,
+  setAvailabilityEnabledState,
+  setInviteStatusState,
+  skipOccurrenceOnce,
+  unskipOccurrence,
+  updateAvailabilityRule,
+  updateInvitationTextState,
+  updateSettings as patchSettings,
+  upsertFriend,
+  type AvailabilityInput,
+  type FriendInput,
+} from '../domain/mutations';
 import {
   buildInviteText,
   buildTimeline,
   computePlanStatus,
   expandAvailability,
+  proposePlanWindow,
+  slotConflictsWithPlans,
   sortFriendsForPicker,
 } from '../domain/model';
-import { startOfDay, formatDateKey, parseDateKey } from '../domain/time';
+import { formatDateKey, parseDateKey, startOfDay } from '../domain/time';
 import type {
   AppData,
   AppSettings,
   AvailabilityRule,
-  CatchUpRhythm,
   ConcreteSlot,
   Friend,
   InviteStatus,
+  InviteTone,
   Plan,
   PlanStatus,
-  ShareMethod,
 } from '../domain/types';
 import {
   clearAppData,
@@ -37,14 +59,15 @@ import {
   exportAppDataJson,
   loadAppData,
   saveAppData,
+  startFreshStorage,
 } from '../persistence/storage';
-import { rescheduleReminders } from '../services/reminders';
+import { WriteQueue } from '../persistence/writeQueue';
+import { cancelAllReminders, rescheduleReminders } from '../services/reminders';
+import { clearOwnedMediaDirectory } from '../services/media';
 import { shareInviteMessage } from '../services/share';
 
 export type TabId = 'when' | 'friends' | 'settings';
-
 export type WhenMode = 'list' | 'week' | 'day';
-
 export type ScreenId =
   | 'loading'
   | 'welcome'
@@ -56,34 +79,30 @@ export type ScreenId =
   | 'editFriend'
   | 'friendProfile'
   | 'addAvailability'
+  | 'editAvailability'
   | 'availability'
   | 'createPlan'
   | 'planDetail'
   | 'moveFriend'
-  | 'privacyPolicy';
+  | 'privacyPolicy'
+  | 'recovery';
 
-type FriendInput = {
-  name: string;
-  photoUri: string | null;
-  phone: string;
-  shareMethod: ShareMethod;
-  rhythm: CatchUpRhythm;
-  customDays: number;
-  lastMetAt: string | null;
-};
-
-type AvailabilityInput = Omit<AvailabilityRule, 'id' | 'createdAt'>;
+export type { FriendInput, AvailabilityInput };
 
 type AppContextValue = {
   ready: boolean;
   loadError: string | null;
+  saveError: string | null;
+  recoveryWarnings: string[];
   data: AppData;
+  now: Date;
   screen: ScreenId;
   tab: TabId;
   selectedSlot: ConcreteSlot | null;
   selectedFriendIds: string[];
   activePlanId: string | null;
   activeFriendId: string | null;
+  activeAvailabilityId: string | null;
   moveFriendId: string | null;
   whenMode: WhenMode;
   whenFocusDate: Date;
@@ -102,6 +121,7 @@ type AppContextValue = {
   openEditFriend: (friendId: string) => void;
   openFriendProfile: (friendId: string) => void;
   openAddAvailability: () => void;
+  openEditAvailability: (ruleId: string) => void;
   openAvailability: () => void;
   openPrivacyPolicy: () => void;
   openOnboarding: () => void;
@@ -111,30 +131,40 @@ type AppContextValue = {
   saveFriend: (input: FriendInput, friendId?: string) => Promise<void>;
   deleteFriend: (friendId: string) => Promise<void>;
   addAvailability: (input: AvailabilityInput) => Promise<void>;
+  updateAvailability: (ruleId: string, input: AvailabilityInput) => Promise<void>;
   skipOccurrence: (ruleId: string, date: string) => Promise<void>;
+  unskipOccurrence: (ruleId: string, date: string) => Promise<void>;
   deleteAvailability: (ruleId: string) => Promise<void>;
   setAvailabilityEnabled: (ruleId: string, enabled: boolean) => Promise<void>;
   savePlanMemory: (note: string, photoUri: string | null) => Promise<void>;
-  completeOnboarding: (
-    name: string,
-    availability: AvailabilityInput,
-  ) => Promise<{ friend: Friend; rule: AvailabilityRule }>;
+  completeOnboarding: (input: {
+    friend?: FriendInput | null;
+    availability?: AvailabilityInput | null;
+  }) => Promise<void>;
+  skipOnboardingExplore: () => Promise<void>;
   createPlan: (input: {
     title: string;
     activity: string;
     place: string;
     note: string;
-  }) => Promise<void>;
+  }) => Promise<{ ok: boolean; message?: string }>;
   updatePlan: (patch: Partial<Pick<Plan, 'title' | 'activity' | 'place' | 'note' | 'startAt' | 'endAt'>>) => Promise<void>;
   setFriendInviteStatus: (friendId: string, status: InviteStatus) => Promise<void>;
+  updateInvitationText: (friendId: string, text: string, customized?: boolean) => Promise<void>;
+  resetInvitationSuggested: (friendId: string, tone?: InviteTone) => Promise<void>;
   shareInvite: (friendId: string, message: string) => Promise<boolean>;
+  confirmInviteSent: (friendId: string, sent: boolean) => Promise<void>;
+  markPlanDone: (attendedFriendIds: string[]) => Promise<void>;
   markPlanStatus: (status: PlanStatus) => Promise<void>;
   openMoveFriend: (friendId: string) => void;
-  moveFriendToSlot: (slot: ConcreteSlot) => Promise<void>;
+  moveFriendToSlot: (slot: ConcreteSlot) => Promise<{ ok: boolean; message?: string }>;
   updateSettings: (patch: Partial<AppSettings>) => Promise<void>;
   exportData: () => Promise<string>;
-  wipeData: () => Promise<void>;
+  wipeData: () => Promise<{ ok: boolean; message?: string }>;
   retryLoad: () => Promise<void>;
+  retrySave: () => Promise<void>;
+  startFresh: () => Promise<void>;
+  logCaughtUp: (friendId: string, whenIso: string) => Promise<void>;
 };
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -142,7 +172,13 @@ const AppContext = createContext<AppContextValue | null>(null);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [recoveryWarnings, setRecoveryWarnings] = useState<string[]>([]);
   const [data, setData] = useState<AppData>(emptyAppData);
+  const dataRef = useRef(data);
+  dataRef.current = data;
+  const writeQueue = useRef(new WriteQueue()).current;
+  const revisionRef = useRef(0);
   const [stack, setStack] = useState<ScreenId[]>(['loading']);
   const stackRef = useRef(stack);
   stackRef.current = stack;
@@ -151,10 +187,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
   const [activePlanId, setActivePlanId] = useState<string | null>(null);
   const [activeFriendId, setActiveFriendId] = useState<string | null>(null);
+  const [activeAvailabilityId, setActiveAvailabilityId] = useState<string | null>(null);
   const [moveFriendId, setMoveFriendId] = useState<string | null>(null);
   const [whenMode, setWhenMode] = useState<WhenMode>('list');
   const [whenFocusDateKey, setWhenFocusDateKey] = useState(() => formatDateKey(startOfDay(new Date())));
+  const [nowTick, setNowTick] = useState(() => Date.now());
 
+  const now = useMemo(() => new Date(nowTick), [nowTick]);
   const whenFocusDate = useMemo(
     () => startOfDay(parseDateKey(whenFocusDateKey)),
     [whenFocusDateKey],
@@ -166,26 +205,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const screen: ScreenId = stack[stack.length - 1] ?? 'loading';
 
-  const resetTo = useCallback(
-    (next: ScreenId) => setStack([next]),
-    [],
-  );
-
-  const push = useCallback(
-    (next: ScreenId) => setStack((current) => [...current, next]),
-    [],
-  );
-
+  const resetTo = useCallback((next: ScreenId) => setStack([next]), []);
+  const push = useCallback((next: ScreenId) => setStack((current) => [...current, next]), []);
   const replaceTop = useCallback(
-    (next: ScreenId) =>
-      setStack((current) => [...current.slice(0, -1), next]),
+    (next: ScreenId) => setStack((current) => [...current.slice(0, -1), next]),
     [],
   );
-
   const goBack = useCallback(() => {
-    setStack((current) =>
-      current.length > 1 ? current.slice(0, -1) : current,
-    );
+    setStack((current) => (current.length > 1 ? current.slice(0, -1) : current));
   }, []);
 
   useEffect(() => {
@@ -199,19 +226,73 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => sub.remove();
   }, [goBack]);
 
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        setNowTick(Date.now());
+        void rescheduleReminders(dataRef.current, revisionRef.current);
+      }
+    });
+    const midnight = setInterval(() => setNowTick(Date.now()), 60_000);
+    return () => {
+      sub.remove();
+      clearInterval(midnight);
+    };
+  }, []);
+
+  const clearSelectionState = useCallback(() => {
+    setSelectedSlot(null);
+    setSelectedFriendIds([]);
+    setActivePlanId(null);
+    setActiveFriendId(null);
+    setActiveAvailabilityId(null);
+    setMoveFriendId(null);
+  }, []);
+
+  const commit = useCallback(async (updater: (current: AppData) => AppData) => {
+    const next = updater(dataRef.current);
+    dataRef.current = next;
+    setData(next);
+    const revision = ++revisionRef.current;
+    await writeQueue.enqueue(async (generation) => {
+      if (generation !== writeQueue.wipeGeneration) return;
+      await saveAppData(next);
+      if (generation !== writeQueue.wipeGeneration) return;
+      await rescheduleReminders(next, revision);
+    });
+    setSaveError(writeQueue.error);
+  }, [writeQueue]);
+
   const hydrate = useCallback(async () => {
     setLoadError(null);
     try {
       const loaded = await loadAppData();
-      setData(loaded);
-      resetTo(!loaded.onboardingComplete && loaded.friends.length === 0 ? 'welcome' : 'when');
+      if (!loaded.ok) {
+        setLoadError(loaded.message);
+        setRecoveryWarnings([]);
+        setReady(true);
+        resetTo('recovery');
+        return;
+      }
+      dataRef.current = loaded.data;
+      setData(loaded.data);
+      setRecoveryWarnings(loaded.warnings);
+      resetTo(!loaded.data.onboardingComplete ? 'welcome' : 'when');
       setTab('when');
       setReady(true);
-      void rescheduleReminders(loaded);
+      revisionRef.current += 1;
+      void rescheduleReminders(loaded.data, revisionRef.current);
+      const referenced = [
+        ...loaded.data.friends.map((friend) => friend.photoUri),
+        ...loaded.data.plans.map((plan) => plan.memoryPhotoUri),
+      ];
+      void import('../services/media').then(({ garbageCollectOwnedMedia }) => (
+        garbageCollectOwnedMedia(referenced)
+      ));
     } catch {
       setLoadError('Could not load your plans. Please try again.');
       setReady(true);
-      resetTo('welcome');
+      resetTo('recovery');
     }
   }, [resetTo]);
 
@@ -219,25 +300,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
     void hydrate();
   }, [hydrate]);
 
-  const commit = useCallback(async (next: AppData) => {
-    setData(next);
-    await saveAppData(next);
-    void rescheduleReminders(next);
-  }, []);
-
   const slots = useMemo(
-    () => expandAvailability(data.availability, data.skipped, startOfDay(new Date()), 21),
-    [data.availability, data.skipped],
+    () => expandAvailability(data.availability, data.skipped, startOfDay(now), 21),
+    [data.availability, data.skipped, now],
   );
 
+  const spotlightPlan = useMemo(() => {
+    const todayKey = formatDateKey(now);
+    return data.plans.find((plan) => (
+      plan.status !== 'done'
+      && plan.status !== 'cancelled'
+      && formatDateKey(new Date(plan.startAt)) === todayKey
+      && new Date(plan.endAt).getTime() >= now.getTime()
+    )) ?? null;
+  }, [data.plans, now]);
+
   const timeline = useMemo(
-    () => buildTimeline(data.friends, data.plans, slots),
-    [data.friends, data.plans, slots],
+    () => buildTimeline(data.friends, data.plans, slots, now, {
+      spotlightPlanId: spotlightPlan?.id ?? null,
+    }),
+    [data.friends, data.plans, slots, now, spotlightPlan],
   );
 
   const sortedFriends = useMemo(
-    () => sortFriendsForPicker(data.friends, data.plans),
-    [data.friends, data.plans],
+    () => sortFriendsForPicker(data.friends, data.plans, now),
+    [data.friends, data.plans, now],
   );
 
   const activePlan = useMemo(
@@ -283,23 +370,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [push]);
 
   const openAddAvailability = useCallback(() => {
+    setActiveAvailabilityId(null);
     push('addAvailability');
   }, [push]);
 
-  const openAvailability = useCallback(() => {
-    push('availability');
+  const openEditAvailability = useCallback((ruleId: string) => {
+    setActiveAvailabilityId(ruleId);
+    push('editAvailability');
   }, [push]);
 
-  const openPrivacyPolicy = useCallback(() => {
-    push('privacyPolicy');
-  }, [push]);
-
-  const openOnboarding = useCallback(() => {
-    push('onboarding');
-  }, [push]);
+  const openAvailability = useCallback(() => push('availability'), [push]);
+  const openPrivacyPolicy = useCallback(() => push('privacyPolicy'), [push]);
+  const openOnboarding = useCallback(() => push('onboarding'), [push]);
 
   const openCreatePlan = useCallback((slot: ConcreteSlot, friendIds?: string[]) => {
-    setSelectedSlot(slot);
+    const window = proposePlanWindow(
+      slot.startAt,
+      slot.endAt,
+      dataRef.current.settings.defaultDurationMinutes,
+    );
+    setSelectedSlot({
+      ...slot,
+      startAt: window.startAt,
+      endAt: window.endAt,
+      startMinutes: new Date(window.startAt).getHours() * 60 + new Date(window.startAt).getMinutes(),
+      endMinutes: new Date(window.endAt).getHours() * 60 + new Date(window.endAt).getMinutes(),
+    });
     setSelectedFriendIds(friendIds ?? []);
     push('createPlan');
   }, [push]);
@@ -318,145 +414,88 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const saveFriend = useCallback(async (input: FriendInput, friendId?: string) => {
-    const name = input.name.trim();
-    if (!name) {
-      return;
-    }
-    const now = new Date().toISOString();
+    if (!input.name.trim()) return;
+    const fromCreatePlan = stackRef.current.includes('createPlan') && selectedSlot;
+    let createdId: string | null = null;
+    await commit((current) => {
+      const result = upsertFriend(current, input, createId, friendId);
+      createdId = result.friend.id;
+      return result.data;
+    });
     if (friendId) {
-      await commit({
-        ...data,
-        friends: data.friends.map((friend) => (
-          friend.id === friendId
-            ? {
-              ...friend,
-              name,
-              photoUri: input.photoUri,
-              phone: input.phone.trim(),
-              shareMethod: input.shareMethod,
-              rhythm: input.rhythm,
-              customDays: input.customDays,
-              lastMetAt: input.lastMetAt,
-            }
-            : friend
-        )),
-      });
       setActiveFriendId(friendId);
       replaceTop('friendProfile');
       return;
     }
-
-    const friend: Friend = {
-      id: createId('friend'),
-      name,
-      photoUri: input.photoUri,
-      phone: input.phone.trim(),
-      shareMethod: input.shareMethod,
-      rhythm: input.rhythm,
-      customDays: input.customDays,
-      lastMetAt: input.lastMetAt,
-      createdAt: now,
-    };
-    await commit({
-      ...data,
-      onboardingComplete: true,
-      friends: [...data.friends, friend],
-    });
-    goFriends();
-  }, [commit, data, goFriends, replaceTop]);
-
-  const deleteFriend = useCallback(async (friendId: string) => {
-    await commit({
-      ...data,
-      friends: data.friends.filter((friend) => friend.id !== friendId),
-      plans: data.plans.map((plan) => ({
-        ...plan,
-        friends: plan.friends.filter((item) => item.friendId !== friendId),
-      })),
-    });
-    goFriends();
-  }, [commit, data, goFriends]);
-
-  const addAvailability = useCallback(async (input: AvailabilityInput) => {
-    const rule: AvailabilityRule = {
-      ...input,
-      id: createId('avail'),
-      createdAt: new Date().toISOString(),
-    };
-    await commit({
-      ...data,
-      availability: [...data.availability, rule],
-    });
-    goWhen();
-  }, [commit, data, goWhen]);
-
-  const skipOccurrence = useCallback(async (ruleId: string, date: string) => {
-    await commit({
-      ...data,
-      skipped: [...data.skipped, { ruleId, date }],
-    });
-  }, [commit, data]);
-
-  const deleteAvailability = useCallback(async (ruleId: string) => {
-    await commit({
-      ...data,
-      availability: data.availability.filter((rule) => rule.id !== ruleId),
-      skipped: data.skipped.filter((item) => item.ruleId !== ruleId),
-    });
-  }, [commit, data]);
-
-  const setAvailabilityEnabled = useCallback(async (ruleId: string, enabled: boolean) => {
-    await commit({
-      ...data,
-      availability: data.availability.map((rule) => (
-        rule.id === ruleId ? { ...rule, enabled } : rule
-      )),
-    });
-  }, [commit, data]);
-
-  const savePlanMemory = useCallback(async (note: string, photoUri: string | null) => {
-    if (!activePlan) {
+    if (fromCreatePlan && createdId && selectedSlot) {
+      setSelectedFriendIds((ids) => (ids.includes(createdId!) ? ids : [...ids, createdId!]));
+      goBack();
       return;
     }
-    await commit({
-      ...data,
-      plans: data.plans.map((plan) => (
-        plan.id === activePlan.id
+    if (stackRef.current[stackRef.current.length - 2] === 'friendProfile') {
+      goBack();
+      return;
+    }
+    goBack();
+  }, [commit, goBack, replaceTop, selectedSlot]);
+
+  const deleteFriend = useCallback(async (friendId: string) => {
+    await commit((current) => removeFriend(current, friendId));
+    goFriends();
+  }, [commit, goFriends]);
+
+  const addAvailability = useCallback(async (input: AvailabilityInput) => {
+    await commit((current) => addAvailabilityRule(current, input, createId));
+    goBack();
+  }, [commit, goBack]);
+
+  const updateAvailability = useCallback(async (ruleId: string, input: AvailabilityInput) => {
+    await commit((current) => updateAvailabilityRule(current, ruleId, input));
+    goBack();
+  }, [commit, goBack]);
+
+  const skipOccurrence = useCallback(async (ruleId: string, date: string) => {
+    await commit((current) => skipOccurrenceOnce(current, ruleId, date));
+  }, [commit]);
+
+  const unskip = useCallback(async (ruleId: string, date: string) => {
+    await commit((current) => unskipOccurrence(current, ruleId, date));
+  }, [commit]);
+
+  const deleteAvailability = useCallback(async (ruleId: string) => {
+    await commit((current) => deleteAvailabilityRule(current, ruleId));
+  }, [commit]);
+
+  const setAvailabilityEnabled = useCallback(async (ruleId: string, enabled: boolean) => {
+    await commit((current) => setAvailabilityEnabledState(current, ruleId, enabled));
+  }, [commit]);
+
+  const savePlanMemory = useCallback(async (note: string, photoUri: string | null) => {
+    if (!activePlanId) return;
+    await commit((current) => ({
+      ...current,
+      plans: current.plans.map((plan) => (
+        plan.id === activePlanId
           ? { ...plan, memoryNote: note, memoryPhotoUri: photoUri, updatedAt: new Date().toISOString() }
           : plan
       )),
-    });
-  }, [activePlan, commit, data]);
+    }));
+  }, [activePlanId, commit]);
 
-  const completeOnboarding = useCallback(async (
-    name: string,
-    availability: AvailabilityInput,
-  ) => {
-    const now = new Date().toISOString();
-    const friend: Friend = {
-      id: createId('friend'),
-      name: name.trim(),
-      photoUri: null,
-      phone: '',
-      shareMethod: 'whatsapp',
-      rhythm: 'monthly',
-      customDays: 45,
-      lastMetAt: null,
-      createdAt: now,
-    };
-    const rule: AvailabilityRule = {
-      ...availability,
-      id: createId('avail'),
-      createdAt: now,
-    };
-    await commit({
-      ...data,
-      onboardingComplete: true,
-      friends: [...data.friends, friend],
-      availability: [...data.availability, rule],
-    });
-    return { friend, rule };
-  }, [commit, data]);
+  const completeOnboarding = useCallback(async (input: {
+    friend?: FriendInput | null;
+    availability?: AvailabilityInput | null;
+  }) => {
+    await commit((current) => completeOnboardingState(current, input, createId));
+    resetTo('when');
+    setTab('when');
+  }, [commit, resetTo]);
+
+  const skipOnboardingExplore = useCallback(async () => {
+    await commit((current) => lookAroundFirst(current));
+    resetTo('when');
+    setTab('when');
+  }, [commit, resetTo]);
 
   const createPlan = useCallback(async (input: {
     title: string;
@@ -464,154 +503,154 @@ export function AppProvider({ children }: { children: ReactNode }) {
     place: string;
     note: string;
   }) => {
-    if (!selectedSlot || selectedFriendIds.length === 0) {
-      return;
+    if (!selectedSlot) {
+      return { ok: false, message: 'Pick a free time first.' };
     }
-    const now = new Date().toISOString();
-    const names = selectedFriendIds
-      .map((id) => data.friends.find((friend) => friend.id === id)?.name)
-      .filter(Boolean);
-    const title = input.title.trim()
-      || (names.length === 1
-        ? `Catch up with ${names[0]}`
-        : `Catch up with ${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`);
-
-    const planFriends = selectedFriendIds.map((friendId) => {
-      const friend = data.friends.find((item) => item.id === friendId);
-      return {
-        friendId,
-        status: 'not_invited' as const,
-        invitationText: buildInviteText({
-          name: friend?.name ?? 'there',
-          startAt: selectedSlot.startAt,
-          activity: input.activity,
-          place: input.place,
-          timeFormat24h: data.settings.timeFormat24h,
-        }),
-      };
+    let message: string | undefined;
+    let planId: string | null = null;
+    await commit((current) => {
+      const result = createPlanState(
+        current,
+        selectedSlot,
+        selectedFriendIds,
+        input,
+        createId,
+      );
+      if (!result.ok) {
+        message = result.message;
+        return current;
+      }
+      planId = result.plan.id;
+      return result.data;
     });
-
-    const plan: Plan = {
-      id: createId('plan'),
-      title,
-      activity: input.activity.trim(),
-      place: input.place.trim(),
-      note: input.note.trim(),
-      startAt: selectedSlot.startAt,
-      endAt: selectedSlot.endAt,
-      availabilityKey: selectedSlot.key,
-      friends: planFriends,
-      status: 'draft',
-      memoryNote: '',
-      memoryPhotoUri: null,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    await commit({
-      ...data,
-      plans: [plan, ...data.plans],
-    });
+    if (!planId) {
+      return { ok: false, message: message ?? 'Could not create the plan.' };
+    }
     setSelectedSlot(null);
     setSelectedFriendIds([]);
-    setActivePlanId(plan.id);
+    setActivePlanId(planId);
     replaceTop('planDetail');
-  }, [commit, data, selectedFriendIds, selectedSlot, replaceTop]);
+    return { ok: true };
+  }, [commit, replaceTop, selectedFriendIds, selectedSlot]);
 
   const updatePlan = useCallback(async (
     patch: Partial<Pick<Plan, 'title' | 'activity' | 'place' | 'note' | 'startAt' | 'endAt'>>,
   ) => {
-    if (!activePlan) {
-      return;
-    }
-    const nextPlans = data.plans.map((plan) => {
-      if (plan.id !== activePlan.id) {
-        return plan;
-      }
-      const updated = {
-        ...plan,
-        ...patch,
-        updatedAt: new Date().toISOString(),
-      };
-      updated.friends = updated.friends.map((item) => {
-        const friend = data.friends.find((entry) => entry.id === item.friendId);
-        return {
-          ...item,
-          invitationText: buildInviteText({
-            name: friend?.name ?? 'there',
-            startAt: updated.startAt,
-            activity: updated.activity,
-            place: updated.place,
-            timeFormat24h: data.settings.timeFormat24h,
-          }),
-        };
-      });
-      return updated;
-    });
-    await commit({ ...data, plans: nextPlans });
-  }, [activePlan, commit, data]);
+    if (!activePlanId) return;
+    await commit((current) => ({
+      ...current,
+      plans: current.plans.map((plan) => {
+        if (plan.id !== activePlanId) return plan;
+        const updated = { ...plan, ...patch, updatedAt: new Date().toISOString() };
+        const timeOrPlaceChanged = Boolean(
+          patch.startAt || patch.endAt || patch.activity !== undefined || patch.place !== undefined,
+        );
+        if (timeOrPlaceChanged) {
+          updated.friends = updated.friends.map((item) => {
+            if (item.invitationCustomized) return item;
+            const friend = current.friends.find((entry) => entry.id === item.friendId);
+            return {
+              ...item,
+              invitationText: buildInviteText({
+                name: friend?.name ?? item.displayNameSnapshot ?? 'there',
+                startAt: updated.startAt,
+                endAt: updated.endAt,
+                activity: updated.activity,
+                place: updated.place,
+                timeFormat24h: current.settings.timeFormat24h,
+                tone: item.inviteTone,
+              }),
+            };
+          });
+        }
+        return updated;
+      }),
+    }));
+  }, [activePlanId, commit]);
 
   const setFriendInviteStatus = useCallback(async (friendId: string, status: InviteStatus) => {
-    if (!activePlan) {
-      return;
-    }
-    const nextFriends = activePlan.friends.map((item) => (
-      item.friendId === friendId ? { ...item, status } : item
-    ));
-    const nextStatus = computePlanStatus(nextFriends);
-    const nextPlans = data.plans.map((plan) => (
-      plan.id === activePlan.id
-        ? {
-          ...plan,
-          friends: nextFriends,
-          status: nextStatus,
-          updatedAt: new Date().toISOString(),
-        }
-        : plan
-    ));
-    await commit({ ...data, plans: nextPlans });
-  }, [activePlan, commit, data]);
+    if (!activePlanId) return;
+    await commit((current) => setInviteStatusState(current, activePlanId, friendId, status));
+  }, [activePlanId, commit]);
+
+  const updateInvitationText = useCallback(async (
+    friendId: string,
+    text: string,
+    customized = true,
+  ) => {
+    if (!activePlanId) return;
+    await commit((current) => updateInvitationTextState(current, activePlanId, friendId, text, customized));
+  }, [activePlanId, commit]);
+
+  const resetInvitationSuggested = useCallback(async (friendId: string, tone: InviteTone = 'warm') => {
+    if (!activePlan || !activePlanId) return;
+    const friend = dataRef.current.friends.find((item) => item.id === friendId);
+    const text = buildInviteText({
+      name: friend?.name ?? 'there',
+      startAt: activePlan.startAt,
+      endAt: activePlan.endAt,
+      activity: activePlan.activity,
+      place: activePlan.place,
+      timeFormat24h: dataRef.current.settings.timeFormat24h,
+      tone,
+    });
+    await commit((current) => ({
+      ...updateInvitationTextState(current, activePlanId, friendId, text, false),
+      plans: current.plans.map((plan) => (
+        plan.id !== activePlanId
+          ? plan
+          : {
+            ...plan,
+            friends: plan.friends.map((item) => (
+              item.friendId === friendId ? { ...item, inviteTone: tone, invitationText: text, invitationCustomized: false } : item
+            )),
+          }
+      )),
+    }));
+  }, [activePlan, activePlanId, commit]);
 
   const shareInvite = useCallback(async (friendId: string, message: string) => {
-    const friend = data.friends.find((item) => item.id === friendId);
+    if (activePlanId) {
+      await commit((current) => updateInvitationTextState(current, activePlanId, friendId, message, true));
+    }
+    const friend = dataRef.current.friends.find((item) => item.id === friendId);
     return shareInviteMessage({
       message,
       method: friend?.shareMethod ?? 'other',
       phone: friend?.phone,
     });
-  }, [data.friends]);
+  }, [activePlanId, commit]);
+
+  const confirmInviteSent = useCallback(async (friendId: string, sent: boolean) => {
+    if (!activePlanId) return;
+    await commit((current) => markInviteSentState(current, activePlanId, friendId, sent));
+  }, [activePlanId, commit]);
+
+  const markPlanDone = useCallback(async (attendedFriendIds: string[]) => {
+    if (!activePlanId) return;
+    await commit((current) => markPlanDoneState(current, activePlanId, attendedFriendIds));
+  }, [activePlanId, commit]);
 
   const markPlanStatus = useCallback(async (status: PlanStatus) => {
-    if (!activePlan) {
+    if (!activePlanId) return;
+    if (status === 'cancelled') {
+      await commit((current) => markPlanCancelledState(current, activePlanId));
+      goWhen();
       return;
     }
-    const now = new Date().toISOString();
-    let nextFriends = data.friends;
     if (status === 'done') {
-      const confirmed = new Set(
-        activePlan.friends
-          .filter((item) => item.status === 'yes')
-          .map((item) => item.friendId),
-      );
-      nextFriends = data.friends.map((friend) => (
-        confirmed.has(friend.id) ? { ...friend, lastMetAt: now } : friend
-      ));
+      return;
     }
-    await commit({
-      ...data,
-      friends: nextFriends,
-      plans: data.plans.map((plan) => (
-        plan.id === activePlan.id
-          ? { ...plan, status, updatedAt: now }
+    await commit((current) => ({
+      ...current,
+      plans: current.plans.map((plan) => (
+        plan.id === activePlanId
+          ? { ...plan, status, updatedAt: new Date().toISOString() }
           : plan
       )),
-    });
-    // Done stays on the plan so the after-moment capture can open;
-    // anything else returns to When.
-    if (status !== 'done') {
-      goWhen();
-    }
-  }, [activePlan, commit, data, goWhen]);
+    }));
+    goWhen();
+  }, [activePlanId, commit, goWhen]);
 
   const openMoveFriend = useCallback((friendId: string) => {
     setMoveFriendId(friendId);
@@ -620,87 +659,157 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const moveFriendToSlot = useCallback(async (slot: ConcreteSlot) => {
     if (!activePlan || !moveFriendId) {
-      return;
+      return { ok: false, message: 'Nothing to move.' };
     }
-    const friend = data.friends.find((item) => item.id === moveFriendId);
-    const now = new Date().toISOString();
-    const remaining = activePlan.friends.map((item) => (
-      item.friendId === moveFriendId ? { ...item, status: 'moved' as const } : item
-    ));
-    const newPlan: Plan = {
-      id: createId('plan'),
-      title: friend ? `Catch up with ${friend.name}` : 'Catch up',
-      activity: activePlan.activity,
-      place: activePlan.place,
-      note: activePlan.note,
-      startAt: slot.startAt,
-      endAt: slot.endAt,
+    const window = proposePlanWindow(
+      slot.startAt,
+      slot.endAt,
+      dataRef.current.settings.defaultDurationMinutes,
+    );
+    if (slotConflictsWithPlans(window.startAt, window.endAt, dataRef.current.plans, {
       availabilityKey: slot.key,
-      friends: [{
-        friendId: moveFriendId,
-        status: 'not_invited',
-        invitationText: buildInviteText({
-          name: friend?.name ?? 'there',
-          startAt: slot.startAt,
-          activity: activePlan.activity,
-          place: activePlan.place,
-          timeFormat24h: data.settings.timeFormat24h,
-        }),
-      }],
-      status: 'draft',
-      memoryNote: '',
-      memoryPhotoUri: null,
-      createdAt: now,
-      updatedAt: now,
-    };
+      excludePlanId: activePlan.id,
+    })) {
+      return { ok: false, message: 'That time was just taken. Pick another free slot.' };
+    }
 
-    await commit({
-      ...data,
-      plans: [
-        newPlan,
-        ...data.plans.map((plan) => (
-          plan.id === activePlan.id
-            ? {
-              ...plan,
-              friends: remaining,
-              status: computePlanStatus(remaining),
-              updatedAt: now,
-            }
-            : plan
-        )),
-      ],
+    let newPlanId: string | null = null;
+    await commit((current) => {
+      const friend = current.friends.find((item) => item.id === moveFriendId);
+      const nowIso = new Date().toISOString();
+      const remaining = activePlan.friends.map((item) => (
+        item.friendId === moveFriendId ? { ...item, status: 'moved' as const } : item
+      ));
+      const newPlan: Plan = {
+        id: createId('plan'),
+        title: friend ? `Catch up with ${friend.name}` : 'Catch up',
+        activity: activePlan.activity,
+        place: activePlan.place,
+        note: activePlan.note,
+        startAt: window.startAt,
+        endAt: window.endAt,
+        availabilityKey: slot.key,
+        friends: [{
+          friendId: moveFriendId,
+          status: 'not_invited',
+          invitationText: buildInviteText({
+            name: friend?.name ?? 'there',
+            startAt: window.startAt,
+            endAt: window.endAt,
+            activity: activePlan.activity,
+            place: activePlan.place,
+            timeFormat24h: current.settings.timeFormat24h,
+          }),
+          inviteTone: 'warm',
+          invitationCustomized: false,
+          sentAt: null,
+          displayNameSnapshot: friend?.name ?? null,
+        }],
+        status: 'draft',
+        memoryNote: '',
+        memoryPhotoUri: null,
+        completedAt: null,
+        cancelledAt: null,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      };
+      newPlanId = newPlan.id;
+      return {
+        ...current,
+        plans: [
+          newPlan,
+          ...current.plans.map((plan) => (
+            plan.id === activePlan.id
+              ? {
+                ...plan,
+                friends: remaining,
+                status: computePlanStatus(remaining),
+                updatedAt: nowIso,
+              }
+              : plan
+          )),
+        ],
+      };
     });
     setMoveFriendId(null);
-    setActivePlanId(newPlan.id);
-    replaceTop('planDetail');
-  }, [activePlan, commit, data, moveFriendId, replaceTop]);
+    if (newPlanId) {
+      setActivePlanId(newPlanId);
+      setStack(['when', 'planDetail']);
+    }
+    return { ok: true };
+  }, [activePlan, commit, moveFriendId]);
 
   const updateSettings = useCallback(async (patch: Partial<AppSettings>) => {
-    await commit({
-      ...data,
-      settings: { ...data.settings, ...patch },
-    });
-  }, [commit, data]);
+    await commit((current) => patchSettings(current, patch));
+  }, [commit]);
 
-  const exportData = useCallback(async () => exportAppDataJson(data), [data]);
+  const exportData = useCallback(async () => exportAppDataJson(dataRef.current), []);
 
   const wipeData = useCallback(async () => {
-    await clearAppData();
-    setData(emptyAppData());
+    writeQueue.invalidate();
+    try {
+      await cancelAllReminders();
+      await clearOwnedMediaDirectory();
+      await clearAppData();
+      const empty = emptyAppData();
+      dataRef.current = empty;
+      setData(empty);
+      clearSelectionState();
+      setSaveError(null);
+      resetTo('welcome');
+      setTab('when');
+      return { ok: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not delete all data.';
+      return { ok: false, message };
+    }
+  }, [clearSelectionState, resetTo, writeQueue]);
+
+  const retrySave = useCallback(async () => {
+    const snapshot = dataRef.current;
+    await writeQueue.enqueue(async (generation) => {
+      if (generation !== writeQueue.wipeGeneration) return;
+      await saveAppData(snapshot);
+    });
+    setSaveError(writeQueue.error);
+  }, [writeQueue]);
+
+  const startFresh = useCallback(async () => {
+    writeQueue.invalidate();
+    await cancelAllReminders();
+    await clearOwnedMediaDirectory();
+    const empty = await startFreshStorage();
+    dataRef.current = empty;
+    setData(empty);
+    clearSelectionState();
+    setLoadError(null);
+    setSaveError(null);
     resetTo('welcome');
-    setTab('when');
-  }, [resetTo]);
+  }, [clearSelectionState, resetTo, writeQueue]);
+
+  const logCaughtUp = useCallback(async (friendId: string, whenIso: string) => {
+    await commit((current) => ({
+      ...current,
+      friends: current.friends.map((friend) => (
+        friend.id === friendId ? { ...friend, lastMetAt: whenIso } : friend
+      )),
+    }));
+  }, [commit]);
 
   const value = useMemo<AppContextValue>(() => ({
     ready,
     loadError,
+    saveError,
+    recoveryWarnings,
     data,
+    now,
     screen,
     tab,
     selectedSlot,
     selectedFriendIds,
     activePlanId,
     activeFriendId,
+    activeAvailabilityId,
     moveFriendId,
     whenMode,
     whenFocusDate,
@@ -719,6 +828,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     openEditFriend,
     openFriendProfile,
     openAddAvailability,
+    openEditAvailability,
     openAvailability,
     openPrivacyPolicy,
     openOnboarding,
@@ -728,15 +838,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     saveFriend,
     deleteFriend,
     addAvailability,
+    updateAvailability,
     skipOccurrence,
+    unskipOccurrence: unskip,
     deleteAvailability,
     setAvailabilityEnabled,
     savePlanMemory,
     completeOnboarding,
+    skipOnboardingExplore,
     createPlan,
     updatePlan,
     setFriendInviteStatus,
+    updateInvitationText,
+    resetInvitationSuggested,
     shareInvite,
+    confirmInviteSent,
+    markPlanDone,
     markPlanStatus,
     openMoveFriend,
     moveFriendToSlot,
@@ -744,18 +861,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     exportData,
     wipeData,
     retryLoad: hydrate,
+    retrySave,
+    startFresh,
+    logCaughtUp,
   }), [
-    ready, loadError, data, screen, tab, selectedSlot, selectedFriendIds,
-    activePlanId, activeFriendId, moveFriendId, whenMode, whenFocusDate,
-    setWhenFocusDate, timeline, slots, sortedFriends,
+    ready, loadError, saveError, recoveryWarnings, data, now, screen, tab,
+    selectedSlot, selectedFriendIds, activePlanId, activeFriendId, activeAvailabilityId,
+    moveFriendId, whenMode, whenFocusDate, setWhenFocusDate, timeline, slots, sortedFriends,
     activePlan, activeFriend, goWhen, goFriends, goSettings, goBack, openAddFriend,
-    openEditFriend, openFriendProfile, openAddAvailability, openAvailability,
-    openPrivacyPolicy, openOnboarding, openCreatePlan,
-    openPlanDetail, toggleFriendSelection, saveFriend, deleteFriend,
-    addAvailability, skipOccurrence, deleteAvailability, setAvailabilityEnabled,
-    savePlanMemory, completeOnboarding, createPlan, updatePlan,
-    setFriendInviteStatus, shareInvite, markPlanStatus, openMoveFriend,
-    moveFriendToSlot, updateSettings, exportData, wipeData, hydrate,
+    openEditFriend, openFriendProfile, openAddAvailability, openEditAvailability,
+    openAvailability, openPrivacyPolicy, openOnboarding, openCreatePlan, openPlanDetail,
+    toggleFriendSelection, saveFriend, deleteFriend, addAvailability, updateAvailability,
+    skipOccurrence, unskip, deleteAvailability, setAvailabilityEnabled, savePlanMemory,
+    completeOnboarding, skipOnboardingExplore, createPlan, updatePlan, setFriendInviteStatus,
+    updateInvitationText, resetInvitationSuggested, shareInvite, confirmInviteSent,
+    markPlanDone, markPlanStatus, openMoveFriend, moveFriendToSlot, updateSettings,
+    exportData, wipeData, hydrate, retrySave, startFresh, logCaughtUp,
   ]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

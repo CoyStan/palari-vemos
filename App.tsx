@@ -25,6 +25,7 @@ import { MoveFriendScreen } from './src/screens/MoveFriendScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { PlanDetailScreen } from './src/screens/PlanDetailScreen';
 import { PrivacyPolicyScreen } from './src/screens/PrivacyPolicyScreen';
+import { RecoveryScreen } from './src/screens/RecoveryScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { WelcomeScreen } from './src/screens/WelcomeScreen';
 import { WhenScreen } from './src/screens/WhenScreen';
@@ -59,13 +60,19 @@ function Root() {
       content = <FriendProfileScreen />;
       break;
     case 'addAvailability':
-      content = <AddAvailabilityScreen />;
+      content = <AddAvailabilityScreen key="add" />;
+      break;
+    case 'editAvailability':
+      content = <AddAvailabilityScreen key="edit" />;
       break;
     case 'availability':
       content = <AvailabilityScreen />;
       break;
     case 'onboarding':
       content = <OnboardingScreen />;
+      break;
+    case 'recovery':
+      content = <RecoveryScreen />;
       break;
     case 'createPlan':
       content = <CreatePlanScreen />;
