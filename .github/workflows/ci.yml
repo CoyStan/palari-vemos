@@ -16,7 +16,7 @@ jobs:
           node-version: '22.13.x'
           cache: npm
       - run: npm ci
-      - run: npm run lint
+      - run: npm run format:check
       - run: npm run typecheck
       - run: npm test
       - run: npm run doctor
