@@ -449,7 +449,11 @@ export function markInviteSentState(
       const friends = plan.friends.map((item) => {
         if (item.friendId !== friendId) return item;
         if (!sent) {
-          return { ...item, status: "not_invited" as const, sentAt: null };
+          // Only waiting → not_invited. Preserve Yes/Maybe/No/New time.
+          if (item.status === "waiting") {
+            return { ...item, status: "not_invited" as const, sentAt: null };
+          }
+          return item;
         }
         return {
           ...item,

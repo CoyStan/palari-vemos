@@ -163,14 +163,14 @@ export function AnimatedDialog({
             sheetStyle,
           ]}
         >
-          <View className="relative items-center px-4 py-2">
+          <View className="relative min-h-[52px] items-center justify-center px-4 py-2">
             <View className="h-1 w-10 rounded-full bg-border" />
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={closeLabel}
               onPress={onClose}
               hitSlop={8}
-              className="absolute right-4 min-h-[44px] min-w-[44px] flex-row items-center justify-center gap-1 rounded-full active:bg-primary-soft"
+              className="absolute right-2 top-1 min-h-[52px] min-w-[52px] flex-row items-center justify-center gap-1 rounded-full active:bg-primary-soft"
             >
               <Icon
                 name="x"

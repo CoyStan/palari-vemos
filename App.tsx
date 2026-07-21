@@ -24,6 +24,7 @@ import { FriendProfileScreen } from "./src/screens/FriendProfileScreen";
 import { FriendsScreen } from "./src/screens/FriendsScreen";
 import { MoveFriendScreen } from "./src/screens/MoveFriendScreen";
 import { OnboardingScreen } from "./src/screens/OnboardingScreen";
+import { PastPlansScreen } from "./src/screens/PastPlansScreen";
 import { PlanDetailScreen } from "./src/screens/PlanDetailScreen";
 import { PrivacyPolicyScreen } from "./src/screens/PrivacyPolicyScreen";
 import { RecoveryScreen } from "./src/screens/RecoveryScreen";
@@ -84,6 +85,9 @@ function Root() {
       break;
     case "moveFriend":
       content = <MoveFriendScreen />;
+      break;
+    case "pastPlans":
+      content = <PastPlansScreen />;
       break;
     case "privacyPolicy":
       content = <PrivacyPolicyScreen />;

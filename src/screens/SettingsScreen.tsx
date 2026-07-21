@@ -78,7 +78,7 @@ export function SettingsScreen() {
               const result = await shareJsonExport(json);
               if (!result.ok) {
                 Alert.alert(
-                  "Export ready",
+                  "Couldn’t export",
                   result.message ??
                     "Could not open the share sheet. Try again.",
                 );
