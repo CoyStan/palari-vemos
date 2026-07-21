@@ -2,7 +2,7 @@
 
 ## Product
 
-So, When? is Palari Labs' deliberately small Android app for turning “we should catch up sometime” into an actual plan.
+So, When? is Palari Labs, Inc.'s deliberately small Android app for turning “we should catch up sometime” into an actual plan.
 
 Friends do not need So, When?, an account, or an invitation link. Version 1 is an organizer for the person using the app—not a new social network.
 

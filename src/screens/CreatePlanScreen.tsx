@@ -158,11 +158,11 @@ export function CreatePlanScreen() {
                     key={option}
                     onPress={() => setActivity(selected ? '' : option)}
                     className={cn(
-                      'min-h-[44px] rounded-full border px-4 py-2',
+                      'min-h-[44px] items-center justify-center rounded-full border px-4',
                       selected ? 'border-primary bg-primary-soft' : 'border-border bg-surface',
                     )}
                   >
-                    <Text className={cn('font-sans-semibold text-caption', selected ? 'text-primary' : 'text-ink')}>
+                    <Text className={cn('text-center font-sans-semibold text-caption leading-5', selected ? 'text-primary' : 'text-ink')}>
                       {option}
                     </Text>
                   </Pressable>
@@ -171,11 +171,11 @@ export function CreatePlanScreen() {
               <Pressable
                 onPress={() => setActivity(activity === 'custom' ? '' : 'custom')}
                 className={cn(
-                  'min-h-[44px] rounded-full border px-4 py-2',
+                  'min-h-[44px] items-center justify-center rounded-full border px-4',
                   activity === 'custom' ? 'border-primary bg-primary-soft' : 'border-border bg-surface',
                 )}
               >
-                <Text className={cn('font-sans-semibold text-caption', activity === 'custom' ? 'text-primary' : 'text-ink')}>
+                <Text className={cn('text-center font-sans-semibold text-caption leading-5', activity === 'custom' ? 'text-primary' : 'text-ink')}>
                   custom
                 </Text>
               </Pressable>

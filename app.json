@@ -7,6 +7,11 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FAF8F5"
+    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.palarilabs.vemos",
@@ -18,7 +23,7 @@
     "android": {
       "package": "com.palarilabs.vemos",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#FAF8F5",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -31,7 +36,7 @@
     },
     "extra": {
       "product": "so-when",
-      "organization": "Palari Labs"
+      "organization": "Palari Labs, Inc."
     },
     "plugins": [
       "expo-font",
@@ -47,7 +52,15 @@
           "photosPermission": "Add an optional photo for a friend you want to see."
         }
       ],
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FAF8F5",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200
+        }
+      ]
     ]
   }
 }

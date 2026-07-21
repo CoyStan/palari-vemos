@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AnimatedDialog } from '../components/AnimatedDialog';
 import { Avatar } from '../components/Avatar';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
@@ -29,10 +30,9 @@ import {
 } from '../domain/time';
 import type { ConcreteSlot } from '../domain/types';
 import { color, shadowSoft } from '../foundation';
+import { hapticTick } from '../services/haptics';
 import { useApp } from '../state/AppProvider';
 import { cn } from '../ui/cn';
-
-type WhenMode = 'list' | 'week' | 'day';
 
 function greeting(): string {
   const hour = new Date().getHours();
@@ -51,13 +51,17 @@ export function WhenScreen() {
     openPlanDetail,
     openAddFriend,
     openFriendProfile,
+    skipOccurrence,
+    whenMode: mode,
+    setWhenMode: setMode,
+    whenFocusDate: focusDate,
+    setWhenFocusDate: setFocusDate,
   } = useApp();
 
   const firstDay = data.settings.firstDayOfWeek;
-  const [mode, setMode] = useState<WhenMode>('week');
-  const [focusDate, setFocusDate] = useState(() => startOfDay(new Date()));
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), firstDay));
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(focusDate, firstDay));
   const [sheetSlot, setSheetSlot] = useState<ConcreteSlot | null>(null);
+  const [skipSlot, setSkipSlot] = useState<ConcreteSlot | null>(null);
 
   useEffect(() => {
     setWeekStart(startOfWeek(focusDate, firstDay));
@@ -78,11 +82,22 @@ export function WhenScreen() {
     [data.plans, days],
   );
 
+  const todaySpotlight = useMemo(() => {
+    const today = formatDateKey(new Date());
+    return data.plans
+      .filter((plan) => (
+        formatDateKey(new Date(plan.startAt)) === today
+        && plan.status !== 'cancelled'
+        && plan.status !== 'done'
+      ))
+      .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())[0] ?? null;
+  }, [data.plans]);
+
   const title = mode === 'day' ? formatDayTitle(focusDate) : formatWeekTitle(weekStart);
 
   const onPrev = () => {
     if (mode === 'day') {
-      setFocusDate((current) => addDays(current, -1));
+      setFocusDate(addDays(focusDate, -1));
     } else {
       const next = addDays(weekStart, -7);
       setWeekStart(next);
@@ -92,7 +107,7 @@ export function WhenScreen() {
 
   const onNext = () => {
     if (mode === 'day') {
-      setFocusDate((current) => addDays(current, 1));
+      setFocusDate(addDays(focusDate, 1));
     } else {
       const next = addDays(weekStart, 7);
       setWeekStart(next);
@@ -111,10 +126,38 @@ export function WhenScreen() {
     openCreatePlan(slot, friendIds);
   };
 
+  const onRequestSkip = (slot: ConcreteSlot) => {
+    if (!slot.ruleId) {
+      return;
+    }
+    hapticTick();
+    setSkipSlot(slot);
+  };
+
+  const onConfirmSkip = async () => {
+    if (!skipSlot?.ruleId) {
+      return;
+    }
+    await skipOccurrence(skipSlot.ruleId, skipSlot.date);
+    setSkipSlot(null);
+  };
+
   const insight = useMemo(
     () => buildInsight(data.friends, data.plans),
     [data.friends, data.plans],
   );
+
+  const spotlightNames = todaySpotlight
+    ? todaySpotlight.friends
+      .map((item) => data.friends.find((friend) => friend.id === item.friendId)?.name)
+      .filter(Boolean)
+      .join(', ')
+    : '';
+
+  const spotlightStart = todaySpotlight ? new Date(todaySpotlight.startAt) : null;
+  const spotlightStartMin = spotlightStart
+    ? spotlightStart.getHours() * 60 + spotlightStart.getMinutes()
+    : 0;
 
   return (
     <SafeAreaView className="flex-1 bg-canvas font-sans" edges={['top', 'left', 'right']}>
@@ -139,6 +182,29 @@ export function WhenScreen() {
           </PressableScale>
         </View>
 
+        {todaySpotlight && spotlightStart ? (
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel={`Today: ${todaySpotlight.title}`}
+            onPress={() => openPlanDetail(todaySpotlight.id)}
+            className="mb-3"
+          >
+            <View className="rounded-card bg-coral-soft p-4" style={shadowSoft}>
+              <Text className="font-sans-semibold text-caption text-coral-deep">
+                Today · {formatClock(spotlightStartMin, data.settings.timeFormat24h)}
+              </Text>
+              <Text className="mt-1 font-sans-bold text-section text-ink">
+                {todaySpotlight.status === 'on'
+                  ? `It’s on${spotlightNames ? ` with ${spotlightNames}` : ''}`
+                  : todaySpotlight.title}
+              </Text>
+              <Text className="mt-1 text-caption text-muted">
+                {PLAN_STATUS_LABELS[todaySpotlight.status]} · tap to open
+              </Text>
+            </View>
+          </PressableScale>
+        ) : null}
+
         <View className="mb-4 flex-row gap-1 rounded-full bg-surface p-1" style={shadowSoft}>
           {([
             ['list', 'List'],
@@ -154,13 +220,13 @@ export function WhenScreen() {
                 accessibilityLabel={`${label} view`}
                 onPress={() => setMode(id)}
                 className={cn(
-                  'min-h-10 flex-1 items-center justify-center rounded-full',
+                  'min-h-10 flex-1 items-center justify-center rounded-full px-2',
                   active && 'bg-primary-soft',
                 )}
               >
                 <Text
                   className={cn(
-                    'text-caption font-sans-semibold',
+                    'text-center text-caption font-sans-semibold leading-5',
                     active ? 'text-primary' : 'text-muted',
                   )}
                 >
@@ -187,7 +253,7 @@ export function WhenScreen() {
               className="min-h-11 items-center justify-center rounded-full bg-surface px-4 active:bg-primary-soft"
               style={shadowSoft}
             >
-              <Text className="text-caption font-sans-semibold text-ink">Today</Text>
+              <Text className="text-center text-caption font-sans-semibold leading-5 text-ink">Today</Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -274,7 +340,14 @@ export function WhenScreen() {
                     key={item.slot.key}
                     accessibilityRole="button"
                     accessibilityLabel={`Free ${formatDayHeading(start)}, tap to make a plan`}
+                    accessibilityHint={item.slot.ruleId ? 'Long press to skip this time' : undefined}
                     onPress={() => setSheetSlot(item.slot)}
+                    onLongPress={
+                      item.slot.ruleId
+                        ? () => onRequestSkip(item.slot)
+                        : undefined
+                    }
+                    delayLongPress={420}
                   >
                     <View className="rounded-card bg-primary-soft p-4">
                       <Text className="font-sans-semibold text-caption text-primary">
@@ -336,7 +409,7 @@ export function WhenScreen() {
             <Text className="text-caption text-muted">
               {data.availability.length === 0
                 ? 'Tap + to mark free time, then tap a slot to plan.'
-                : 'Tap a free slot to plan · tap a plan to open it'}
+                : 'Tap a free slot to plan · long-press to skip · tap a plan to open'}
             </Text>
             <WhenCalendar
               mode={mode}
@@ -350,6 +423,7 @@ export function WhenScreen() {
               dayEndHour={data.settings.calendarDayEndHour}
               onFocusDate={setFocusDate}
               onOpenSlot={setSheetSlot}
+              onSkipSlot={onRequestSkip}
               onOpenPlan={openPlanDetail}
               onSwitchToDay={() => setMode('day')}
             />
@@ -362,6 +436,25 @@ export function WhenScreen() {
         onClose={() => setSheetSlot(null)}
         onMakePlan={onMakePlan}
       />
+
+      <AnimatedDialog
+        visible={skipSlot !== null}
+        onClose={() => setSkipSlot(null)}
+        accessibilityLabel="Skip this free time"
+      >
+        <View className="gap-3 px-5 pb-4">
+          <Text className="font-sans-bold text-section text-ink">
+            Skip this free time?
+          </Text>
+          <Text className="text-body text-muted">
+            {skipSlot
+              ? `Hide ${formatDayHeading(new Date(skipSlot.startAt))} ${formatClock(skipSlot.startMinutes, data.settings.timeFormat24h)} just this once. Your recurring rule stays.`
+              : ''}
+          </Text>
+          <Button label="Skip this one" onPress={() => void onConfirmSkip()} />
+          <Button label="Keep it" variant="ghost" onPress={() => setSkipSlot(null)} />
+        </View>
+      </AnimatedDialog>
     </SafeAreaView>
   );
 }

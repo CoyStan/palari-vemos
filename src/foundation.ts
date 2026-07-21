@@ -1,5 +1,5 @@
 /**
- * Vemos visual tokens — keep in sync with tailwind.config.js theme.extend.
+ * So, When? visual tokens — keep in sync with tailwind.config.js theme.extend.
  * Use these for JS-driven styles (calendar chips, absolute layout math).
  * Prefer NativeWind className for static UI.
  */

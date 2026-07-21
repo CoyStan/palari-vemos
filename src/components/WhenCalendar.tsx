@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -45,6 +45,7 @@ type Props = {
   dayEndHour?: number;
   onFocusDate: (date: Date) => void;
   onOpenSlot: (slot: ConcreteSlot) => void;
+  onSkipSlot?: (slot: ConcreteSlot) => void;
   onOpenPlan: (planId: string) => void;
   onSwitchToDay: () => void;
 };
@@ -61,10 +62,12 @@ export function WhenCalendar({
   dayEndHour = DAY_END_HOUR,
   onFocusDate,
   onOpenSlot,
+  onSkipSlot,
   onOpenPlan,
   onSwitchToDay,
 }: Props) {
   const [gridWidth, setGridWidth] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
   const todayKey = formatDateKey(new Date());
   const focusKey = formatDateKey(focusDate);
   const visibleDays = mode === 'day' ? [focusDate] : days;
@@ -89,6 +92,21 @@ export function WhenCalendar({
       setGridWidth(next);
     }
   };
+
+  // Land near "now" so the grid feels oriented when opening Week/Day.
+  useEffect(() => {
+    if (gridWidth <= 0) {
+      return;
+    }
+    const offset = Math.max(
+      0,
+      ((nowMinutes - startHour * 60) / 60) * HOUR_HEIGHT - HOUR_HEIGHT * 1.5,
+    );
+    const timer = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: offset, animated: false });
+    }, 40);
+    return () => clearTimeout(timer);
+  }, [gridWidth, mode, focusKey, startHour, nowMinutes]);
 
   return (
     <View
@@ -152,6 +170,7 @@ export function WhenCalendar({
           </View>
 
           <ScrollView
+            ref={scrollRef}
             className="flex-1"
             contentContainerStyle={{ paddingBottom: 24, width: gridWidth }}
             showsVerticalScrollIndicator={false}
@@ -209,6 +228,11 @@ export function WhenCalendar({
                               onOpenSlot(slot);
                             }
                           }}
+                          onLongPress={
+                            onSkipSlot && slot.ruleId && !slotIsBooked(slot, plans)
+                              ? () => onSkipSlot(slot)
+                              : undefined
+                          }
                         />
                       ))}
 
@@ -270,6 +294,7 @@ function FreeBlockView({
   compact,
   timeFormat24h,
   onPress,
+  onLongPress,
 }: {
   slot: ConcreteSlot;
   dayWidth: number;
@@ -278,6 +303,7 @@ function FreeBlockView({
   compact: boolean;
   timeFormat24h: boolean;
   onPress: () => void;
+  onLongPress?: () => void;
 }) {
   const top = ((slot.startMinutes - dayStartHour * 60) / 60) * HOUR_HEIGHT;
   const height = ((slot.endMinutes - slot.startMinutes) / 60) * HOUR_HEIGHT;
@@ -285,9 +311,12 @@ function FreeBlockView({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Free ${formatClock(slot.startMinutes, timeFormat24h)} to ${formatClock(slot.endMinutes, timeFormat24h)}`}
+      accessibilityLabel={`Free ${formatClock(slot.startMinutes, timeFormat24h)} to ${formatClock(slot.endMinutes, timeFormat24h)}. Long press to skip this time.`}
+      accessibilityHint={onLongPress ? 'Long press to skip this occurrence' : undefined}
       disabled={booked}
       onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={420}
       className="absolute z-[1] rounded-[10px] border border-dashed border-primary-softBorder bg-primary-soft px-1.5 py-1"
       style={{
         top,

@@ -19,6 +19,7 @@ import {
   formatClock,
   INVITE_STATUS_LABELS,
   PLAN_STATUS_LABELS,
+  SHARE_OPTIONS,
 } from '../domain/model';
 import type { InviteStatus, InviteTone, PlanStatus } from '../domain/types';
 import { formatDayHeading } from '../domain/time';
@@ -259,15 +260,15 @@ export function PlanDetailScreen() {
                       accessibilityRole="button"
                       accessibilityLabel={`Change status for ${friend.name}`}
                       onPress={() => setStatusFriendId(item.friendId)}
-                      className="min-h-[36px] justify-center rounded-full bg-primary-soft px-3 py-1.5 active:bg-primary-softBorder"
+                      className="min-h-[36px] items-center justify-center rounded-full bg-primary-soft px-3 active:bg-primary-softBorder"
                     >
-                      <Text className="text-caption font-sans-semibold text-primary">
+                      <Text className="text-center text-caption font-sans-semibold leading-5 text-primary">
                         {INVITE_STATUS_LABELS[item.status]}
                       </Text>
                     </Pressable>
                   </View>
 
-                  <View className="flex-row gap-2">
+                  <View className="flex-row flex-wrap gap-2">
                     {TONE_OPTIONS.map((option) => {
                       const selected = tone === option.value;
                       return (
@@ -284,7 +285,7 @@ export function PlanDetailScreen() {
                         >
                           <Text
                             className={cn(
-                              'text-caption font-sans-semibold',
+                              'text-center text-caption font-sans-semibold leading-5',
                               selected ? 'text-primary' : 'text-muted',
                             )}
                           >
@@ -305,7 +306,7 @@ export function PlanDetailScreen() {
                     className="min-h-[96px]"
                   />
                   <Button
-                    label={`Share with ${friend.name}`}
+                    label={`Share via ${SHARE_OPTIONS.find((option) => option.value === friend.shareMethod)?.label ?? 'share'} with ${friend.name}`}
                     onPress={() => void onShare(item.friendId, draft)}
                   />
                   {item.status === 'new_time' ? (

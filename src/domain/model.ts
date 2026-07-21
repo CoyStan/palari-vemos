@@ -295,6 +295,99 @@ export function slotIsBooked(slot: ConcreteSlot, plans: Plan[]): boolean {
   });
 }
 
+/**
+ * Suggest plan-sized free windows for scheduling with someone.
+ * Prefer distinct days; carve longer free blocks into chunks; look ahead
+ * far enough to usually return at least `count` options.
+ */
+export function suggestSlotsForScheduling(
+  rules: AvailabilityRule[],
+  skipped: SkippedOccurrence[],
+  plans: Plan[],
+  options?: {
+    count?: number;
+    durationMinutes?: number;
+    from?: Date;
+  },
+): ConcreteSlot[] {
+  const count = options?.count ?? 3;
+  const duration = Math.max(30, options?.durationMinutes ?? 120);
+  const from = options?.from ?? startOfDay(new Date());
+
+  const carve = (window: ConcreteSlot, startMinutes: number): ConcreteSlot | null => {
+    const endMinutes = Math.min(window.endMinutes, startMinutes + duration);
+    if (endMinutes - startMinutes < 30) {
+      return null;
+    }
+    const candidate: ConcreteSlot = {
+      key: `${window.ruleId ?? 'free'}:${window.date}:${startMinutes}`,
+      ruleId: window.ruleId,
+      date: window.date,
+      startMinutes,
+      endMinutes,
+      startAt: dateAtMinutes(window.date, startMinutes).toISOString(),
+      endAt: dateAtMinutes(window.date, endMinutes).toISOString(),
+      label: window.label,
+    };
+    if (slotIsBooked(candidate, plans)) {
+      return null;
+    }
+    return candidate;
+  };
+
+  const collect = (dayCount: number): ConcreteSlot[] => {
+    const windows = expandAvailability(rules, skipped, from, dayCount)
+      .filter((slot) => !slotIsBooked(slot, plans) && slot.endMinutes - slot.startMinutes >= 30)
+      .sort((a, b) => a.startAt.localeCompare(b.startAt));
+
+    const picks: ConcreteSlot[] = [];
+    const usedDays = new Set<string>();
+
+    // Pass 1: one suggestion per day, at the start of each free window.
+    for (const window of windows) {
+      if (picks.length >= count) {
+        break;
+      }
+      if (usedDays.has(window.date)) {
+        continue;
+      }
+      const pick = carve(window, window.startMinutes);
+      if (pick) {
+        picks.push(pick);
+        usedDays.add(window.date);
+      }
+    }
+
+    // Pass 2: fill remaining from later starts inside longer windows.
+    if (picks.length < count) {
+      for (const window of windows) {
+        if (picks.length >= count) {
+          break;
+        }
+        let cursor = window.startMinutes + duration;
+        while (cursor + 30 <= window.endMinutes && picks.length < count) {
+          const pick = carve(window, cursor);
+          if (
+            pick
+            && !picks.some((item) => item.key === pick.key)
+          ) {
+            picks.push(pick);
+          }
+          cursor += duration;
+        }
+      }
+    }
+
+    return picks.slice(0, count);
+  };
+
+  const first = collect(21);
+  if (first.length >= count) {
+    return first;
+  }
+  return collect(42);
+}
+
 export function expandAvailability(
   rules: AvailabilityRule[],
   skipped: SkippedOccurrence[],

@@ -19,6 +19,12 @@
       "skillPath": "security/android-intent-security/SKILL.md",
       "computedHash": "c6af6a1d8b27cdcbd90a5e96f4049f7a295eb520e8435a362aae464e673ab9f9"
     },
+    "android-testing": {
+      "source": "new-silvermoon/awesome-android-agent-skills",
+      "sourceType": "github",
+      "skillPath": ".github/skills/testing_and_automation/android-testing/SKILL.md",
+      "computedHash": "744cd26fe4f2b741f86a93d20e72b27399edd8aef8345e908aceae9df37c278c"
+    },
     "appfunctions": {
       "source": "android/skills",
       "sourceType": "github",
@@ -36,6 +42,12 @@
       "sourceType": "github",
       "skillPath": "xr/display-glasses-with-jetpack-compose-glimmer/SKILL.md",
       "computedHash": "c61a6886682e88cd06124e853b4d3bb238def246bccff0a2f4e6f67520ebcce7"
+    },
+    "eas-app-stores": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "skillPath": "plugins/expo/skills/eas-app-stores/SKILL.md",
+      "computedHash": "69d7b0fecb83bb39253b7a7377c33393dcd6dbb7beeaea287c4199908e238d44"
     },
     "edge-to-edge": {
       "source": "android/skills",
@@ -84,6 +96,18 @@
       "sourceType": "github",
       "skillPath": "play/play-policy-insights/SKILL.md",
       "computedHash": "31babfec003504cb10694257698deae5b4ee33e3cfc77b5b51a437f1dc5f993f"
+    },
+    "qa-testing-android": {
+      "source": "vasilyu1983/ai-agents-public",
+      "sourceType": "github",
+      "skillPath": "frameworks/shared-skills/skills/qa-testing-android/SKILL.md",
+      "computedHash": "a38101c1e62c0374a76cabad0c55f1ea4e348bf086cbdf9a557a465a6b23647b"
+    },
+    "qa-testing-mobile": {
+      "source": "vasilyu1983/ai-agents-public",
+      "sourceType": "github",
+      "skillPath": "frameworks/shared-skills/skills/qa-testing-mobile/SKILL.md",
+      "computedHash": "ad6be7916ce9bac911b0090e859568380f15973ff7a8a2c0f987ab8e12574584"
     },
     "r8-analyzer": {
       "source": "android/skills",

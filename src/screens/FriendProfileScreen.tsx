@@ -1,19 +1,25 @@
+import { useMemo } from 'react';
 import { Alert, Text, View } from 'react-native';
 
 import { Avatar } from '../components/Avatar';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
+import { PressableScale } from '../components/PressableScale';
 import { Screen } from '../components/Screen';
 import { ScreenHeader } from '../components/ScreenHeader';
 import {
   catchUpLabel,
   catchUpStatus,
+  formatClock,
   lastMetLabel,
   PLAN_STATUS_LABELS,
   RHYTHM_OPTIONS,
   SHARE_OPTIONS,
+  suggestSlotsForScheduling,
 } from '../domain/model';
 import { formatDayHeading } from '../domain/time';
+import type { ConcreteSlot } from '../domain/types';
+import { hapticTick } from '../services/haptics';
 import { useApp } from '../state/AppProvider';
 import { cn } from '../ui/cn';
 
@@ -23,9 +29,26 @@ export function FriendProfileScreen() {
     data,
     openEditFriend,
     openPlanDetail,
+    openCreatePlan,
+    openAddAvailability,
     deleteFriend,
     goBack,
   } = useApp();
+
+  const suggestions = useMemo(() => {
+    if (!activeFriend) {
+      return [] as ConcreteSlot[];
+    }
+    return suggestSlotsForScheduling(
+      data.availability,
+      data.skipped,
+      data.plans,
+      {
+        count: 3,
+        durationMinutes: data.settings.defaultDurationMinutes,
+      },
+    );
+  }, [activeFriend, data.availability, data.skipped, data.plans, data.settings.defaultDurationMinutes]);
 
   if (!activeFriend) {
     return (
@@ -67,6 +90,11 @@ export function FriendProfileScreen() {
     );
   };
 
+  const onPickSuggestion = (slot: ConcreteSlot) => {
+    hapticTick();
+    openCreatePlan(slot, [friend.id]);
+  };
+
   return (
     <Screen contentClassName="gap-5">
       <ScreenHeader title={friend.name} onBack={goBack} />
@@ -77,7 +105,7 @@ export function FriendProfileScreen() {
         <Text className="text-body text-muted">{lastMetLabel(friend.lastMetAt)}</Text>
         <View
           className={cn(
-            'mt-1 rounded-full px-3 py-1',
+            'mt-1 items-center justify-center rounded-full px-3 py-1.5',
             catchUpStatus(friend) === 'due' && 'bg-coral-soft',
             catchUpStatus(friend) === 'soon' && 'bg-primary-soft',
             catchUpStatus(friend) === 'none' && 'bg-canvas',
@@ -85,7 +113,7 @@ export function FriendProfileScreen() {
         >
           <Text
             className={cn(
-              'text-caption font-sans-semibold',
+              'text-center text-caption font-sans-semibold leading-5',
               catchUpStatus(friend) === 'due' && 'text-coral-deep',
               catchUpStatus(friend) === 'soon' && 'text-primary',
               catchUpStatus(friend) === 'none' && 'text-muted',
@@ -125,10 +153,51 @@ export function FriendProfileScreen() {
               <Text className="text-caption text-muted">
                 {formatDayHeading(new Date(plan.startAt))} · {PLAN_STATUS_LABELS[plan.status]}
               </Text>
+              {plan.memoryNote ? (
+                <Text className="mt-1 text-body text-muted">{plan.memoryNote}</Text>
+              ) : null}
             </Card>
           ))}
         </View>
       ) : null}
+
+      <View className="gap-2">
+        <Text className="font-sans-bold text-section text-ink">
+          Free times you could invite {friend.name}
+        </Text>
+        {suggestions.length > 0 ? (
+          suggestions.map((slot) => (
+            <PressableScale
+              key={slot.key}
+              accessibilityRole="button"
+              accessibilityLabel={`Plan with ${friend.name} on ${formatDayHeading(new Date(slot.startAt))}`}
+              onPress={() => onPickSuggestion(slot)}
+            >
+              <View className="rounded-card bg-primary-soft p-4">
+                <Text className="font-sans-semibold text-caption text-primary">
+                  {formatDayHeading(new Date(slot.startAt))}
+                </Text>
+                <Text className="mt-1 font-sans-bold text-section text-ink">
+                  {formatClock(slot.startMinutes, data.settings.timeFormat24h)}
+                  {' – '}
+                  {formatClock(slot.endMinutes, data.settings.timeFormat24h)}
+                </Text>
+                <Text className="mt-1 text-body text-primary">
+                  Tap to plan with {friend.name}
+                </Text>
+              </View>
+            </PressableScale>
+          ))
+        ) : (
+          <Card className="gap-3 p-4">
+            <Text className="text-body text-muted">
+              No free windows yet. Add when you’re usually free, then come back
+              to pick a time with {friend.name}.
+            </Text>
+            <Button label="Add availability" variant="secondary" onPress={openAddAvailability} />
+          </Card>
+        )}
+      </View>
 
       <Button label="Edit" onPress={() => openEditFriend(friend.id)} />
       <Button label="Remove friend" variant="ghost" onPress={onDelete} />
