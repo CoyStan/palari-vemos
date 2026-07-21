@@ -1,59 +1,58 @@
-# Vemos — build brief
+# So, When? — build brief
 
 ## Product
 
-Vemos is Palari Labs' deliberately small app for helping people actually see the friends they mean to see.
+So, When? is Palari Labs' deliberately small Android app for turning “we should catch up sometime” into an actual plan.
 
-> Turn “we should catch up sometime” into a real invitation in a few taps.
-
-Friends do not need Vemos. The owner adds a small circle of people, chooses a loose rhythm, receives one gentle suggestion, and shares an invitation with the phone's normal share sheet.
+Friends do not need So, When?, an account, or an invitation link. Version 1 is an organizer for the person using the app—not a new social network.
 
 ## Build for the first Google Play release
 
 - Expo-managed React Native app, TypeScript, Android-first.
-- Package id: com.palarilabs.vemos. Change only if Play Console rejects it.
-- Start with npm install, then npm run android.
+- Package id: `com.palarilabs.vemos`. Change only if Play Console rejects it.
+- Start with `npm install`, then `npm run android`.
 - Keep the first release local-first: no account, backend, OAuth, payments, analytics, or remote database without an explicit decision.
 - Use Expo modules and the native share sheet. Do not build a messaging system.
-- Keep friend data on-device. Do not import contacts in version 0.1.
+- Keep friend data on-device. Prefer the native contact picker for a **single** contact — never scan or upload the address book.
 
 ## MVP scope — build in this order
 
-1. Tiny onboarding and manual add-first-friend flow.
-2. Friends: name, optional note, contact method, priority to meet (1–5), last-met date.
-3. Free times: recurring weekly blocks plus one-off dated blocks.
-4. Calendar (main tab): week + hour grid; tap a free block → pick a friend (priority-sorted).
-5. Editable invitation for that slot; share via the native share sheet.
-6. Invitation status: to send, sent, accepted, canceled, moved (owner-tracked).
+1. Tiny onboarding and add-first-friend (manual + contact picker).
+2. Friends: name, optional photo/phone/share method, catch-up rhythm, last-seen date.
+3. When: chronological next 2–3 weeks — availability, plans, friends due for a catch-up.
+4. Availability: recurring presets + one-time; skip occurrence without changing the rule.
+5. Plan: multi-friend picker, activity/place/note, editable invite text, native share.
+6. Follow-through: per-friend statuses, plan Done/Cancelled, move to another time.
+7. Settings: quiet local reminders, defaults, privacy, export, wipe.
 
-## Explicitly not version 0.1
+## Explicitly not version 1
 
 - Social feed, chat, follower graph, streaks, leaderboards, scores, or relationship-health dashboards.
-- Event scraping, ticketing, maps, recommendation AI, calendar OAuth, contact syncing, groups, or push notifications.
-- Generic event discovery. Events are an optional excuse; friendship is the product.
+- Event scraping, ticketing, maps, recommendation AI, calendar OAuth, bulk contact syncing, groups, or remote push.
+- Generic event discovery. Friendship is the product.
 
 ## UX and voice
 
 - Warm, low-pressure, and specific. Say “Want to invite Ana?” not “Ana is overdue.”
-- Never shame users for elapsed time: no red alerts, rankings, scores, or countdowns.
-- Make the next action singular and easy. An invitation should take two taps from the suggestion.
-- Always let the owner edit an invitation before sharing.
+- Catch-up labels may show Due / Soon / No schedule, but never shame with red guilt alerts or rankings.
+- Make the next action singular and easy. Always let the owner edit an invitation before sharing.
 - Use at least 44 by 44 point touch targets, respect font scaling, and label icon-only controls.
 
 ## Visual language
 
-Vemos is a warm consumer sibling of Palari, not a copy of the company console. Use src/foundation.ts: quiet blue-gray canvas, white surfaces, deep slate type, restrained teal action, and soft coral only for warmth. Prefer generous whitespace, open lists, and one focused plan card.
+Use `src/foundation.ts`: warm off-white canvas, white surfaces with soft teal-tinted shadows, deep slate type, restrained teal action, and soft coral only for warmth. Prefer generous whitespace and one focused plan card.
 
-The target home-screen mood and hierarchy are in docs/reference/vemos-home-concept.png. Use it as reference, never as a static screen to ship.
+Standard primitives below `src/components`: `Card` (surface + soft shadow), `PressableScale` (calm 0.97 press), `AnimatedDialog` (bottom sheets — use instead of raw `Modal`/`Alert`), `ScreenTransition` (screen entry motion), `Button` (pill primary), `Screen`/`ScreenHeader`, `Avatar`, `TextField`, `ChoiceRow`.
 
-Avoid dense dashboards, bento grids, gradients, floating metric pills, notification counts, stock-avatar walls, and fake activity.
+Avoid dense dashboards, bento grids, gradients, floating metric pills, notification counts, and fake activity.
 
 ## Code and quality rules
 
-- Keep App.tsx as composition glue; add focused screens and reusable primitives below src.
+- Keep `App.tsx` as composition glue; add focused screens and reusable primitives below `src`.
 - Keep domain models, seed data, persistence, and UI separate.
-- Create useful empty, loading, and error states. A first run must not lead to a dead blank screen.
+- Navigation lives in `src/state/AppProvider.tsx` as a back stack: `open*` pushes, `goBack()` pops, `goWhen/goFriends/goSettings` reset to a tab root. Screens use `goBack()` for back arrows; Android hardware back is wired.
+- Create useful empty, loading, and error states.
 - Prefer Expo SDK and React Native APIs. Add dependencies only when a real screen needs them.
-- Never commit secrets, keystores, node_modules, build output, or personal friend data.
-- Before an Android build, run npm run typecheck and test onboarding, adding a friend, sharing, snoozing, and marking Met up.
+- Never commit secrets, keystores, `node_modules`, build output, or personal friend data.
+- Before an Android build, run `npm run typecheck` and test onboarding, adding a friend (manual + picker), sharing, statuses, and marking Done.
 - Before production, replace starter icon/splash art and complete Play Data safety, privacy policy, content rating, and listing requirements.

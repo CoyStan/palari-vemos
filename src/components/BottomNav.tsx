@@ -1,95 +1,73 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { color, space, type } from '../foundation';
+import { color, shadowSoft } from '../foundation';
 import type { TabId } from '../state/AppProvider';
+import { cn } from '../ui/cn';
+import { Icon } from './Icon';
 
 type Props = {
   active: TabId;
-  onCalendar: () => void;
+  onWhen: () => void;
   onFriends: () => void;
+  onSettings: () => void;
 };
 
-export function BottomNav({ active, onCalendar, onFriends }: Props) {
+export function BottomNav({ active, onWhen, onFriends, onSettings }: Props) {
   const insets = useSafeAreaInsets();
-
   return (
-    <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, space.sm) }]}>
-      <NavItem
-        label="Calendar"
-        glyph="▦"
-        active={active === 'calendar'}
-        onPress={onCalendar}
-      />
-      <NavItem
-        label="Friends"
-        glyph="◎"
-        active={active === 'friends'}
-        onPress={onFriends}
-      />
+    <View
+      className="px-4 pt-2"
+      style={{ paddingBottom: Math.max(insets.bottom, 12) }}
+    >
+      <View
+        className="flex-row rounded-full bg-surface p-2"
+        style={shadowSoft}
+      >
+        <NavItem label="When" icon="calendar" active={active === 'when'} onPress={onWhen} />
+        <NavItem label="Friends" icon="users" active={active === 'friends'} onPress={onFriends} />
+        <NavItem label="Settings" icon="settings" active={active === 'settings'} onPress={onSettings} />
+      </View>
     </View>
   );
 }
 
 function NavItem({
   label,
-  glyph,
+  icon,
   active,
   onPress,
 }: {
   label: string;
-  glyph: string;
+  icon: 'calendar' | 'users' | 'settings';
   active: boolean;
   onPress: () => void;
 }) {
+  const tint = active ? color.primary : color.muted;
   return (
     <Pressable
       accessibilityRole="tab"
       accessibilityState={{ selected: active }}
       accessibilityLabel={label}
       onPress={onPress}
-      style={({ pressed }) => [styles.item, pressed ? styles.pressed : null]}
+      className="flex-1"
     >
-      <Text style={[styles.glyph, active ? styles.activeText : styles.inactiveText]}>
-        {glyph}
-      </Text>
-      <Text style={[styles.label, active ? styles.activeText : styles.inactiveText]}>
-        {label}
-      </Text>
+      <View
+        className={cn(
+          'min-h-[52px] items-center justify-center gap-1 rounded-full',
+          active && 'bg-primary-soft',
+        )}
+      >
+        <Icon name={icon} size={22} color={tint} />
+        <Text
+          className={cn(
+            'text-caption font-sans-semibold',
+            active ? 'text-primary' : 'text-muted',
+          )}
+        >
+          {label}
+        </Text>
+      </View>
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  bar: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: color.border,
-    backgroundColor: color.surface,
-    paddingTop: space.sm,
-  },
-  item: {
-    flex: 1,
-    minHeight: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-  },
-  pressed: {
-    opacity: 0.7,
-  },
-  glyph: {
-    fontSize: 18,
-    lineHeight: 22,
-  },
-  label: {
-    fontSize: type.caption,
-    fontWeight: '600',
-  },
-  activeText: {
-    color: color.primary,
-  },
-  inactiveText: {
-    color: color.muted,
-  },
-});

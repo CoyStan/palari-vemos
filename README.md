@@ -1,14 +1,36 @@
-# Vemos
+# So, When?
 
-Vemos is the tiny Palari Labs app that turns “we should catch up sometime” into a real invitation.
+So, When? is the tiny Palari Labs app that turns “we should catch up sometime” into an actual plan — local-only, friends never need the app.
+
+## Stack
+
+- Expo (React Native) + TypeScript, Android-first
+- **NativeWind** (Tailwind utility classes via `className`)
+- Design tokens in `tailwind.config.js` (mirrored for JS in `src/foundation.ts`)
+- On-device persistence with AsyncStorage (`sowhen.v1`)
+- Typography: Quicksand · Icons: Feather (`@expo/vector-icons`)
+- Optional local reminders via `expo-notifications`
+- Single-contact picker via `expo-contacts` (`Contact.presentPicker`)
 
 ## Open in Cursor
 
-1. Open this folder in Cursor.
-2. Read AGENTS.md and docs/PRODUCT.md; the Cursor rule does this automatically.
-3. Run npm run android to launch the Expo app on an Android device or emulator.
-4. Build the MVP in the six-screen order defined in docs/PRODUCT.md.
+1. Read [AGENTS.md](AGENTS.md) and [docs/PRODUCT.md](docs/PRODUCT.md).
+2. `npm install`
+3. `npm run android` (device/emulator) or `npm run web` for layout preview.
+4. After NativeWind/config changes, clear Metro: `npx expo start -c`
+
+## App shape
+
+Three tabs:
+
+1. **When** — next 2–3 weeks of free times and plans; FAB to add availability
+2. **Friends** — people you want to see; manual add or one contact from the OS picker
+3. **Settings** — quiet reminders, defaults, privacy, export / wipe
+
+## Styling
+
+Prefer NativeWind `className` for UI. Keep brand colors in sync between `tailwind.config.js` and `src/foundation.ts`.
 
 ## Release
 
-Google Play preparation and EAS commands are in docs/PLAY_RELEASE.md. The Android application id is com.palarilabs.vemos.
+Google Play / EAS notes: [docs/PLAY_RELEASE.md](docs/PLAY_RELEASE.md). Package id: `com.palarilabs.vemos`.

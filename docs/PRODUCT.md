@@ -1,40 +1,57 @@
-# Vemos product canon
+# So, When? product canon
 
 ## One sentence
 
-Vemos makes it easy to turn free time into a real catch-up with the friends you mean to see.
+So, When? helps people turn “we should catch up sometime” into an actual plan — privately, on one phone.
 
 ## Core loop
 
-Add friends (with priority) → mark free times (weekly + one-off) → tap a free slot on the week calendar → pick a friend → edit and share an invitation → update status (sent / accepted / canceled / moved).
+Add friends → define availability → tap a free time → choose friends → share invitations → track replies → meet them.
 
-## First-release screens
+## Language
 
-| Screen | Job | Primary action |
+Use **friend**, **availability**, **plan**, **invitation**, and **catch-up rhythm**. Avoid calling everything an “event.”
+
+## Main screens (three tabs)
+
+| Tab | Job | Primary action |
 | --- | --- | --- |
-| Welcome | Explain the promise in one breath | Add first friend |
-| Calendar | Week + hour grid of free time and invites | Tap free block |
-| Free times | Manage recurring and one-off availability | Add free time |
-| Pick friend | Choose who to invite (priority-sorted) | Create invitation |
-| Invite detail | Edit message and track status | Share / accept / move / cancel |
-| Friends | Last met + priority | Add / edit friend |
+| When | Next 2–3 weeks as a list, plus week/day calendar of free times and plans | Tap a free slot / FAB + |
+| Friends | Grid/list of people you want to see | Add manually or from contacts |
+| Settings | Reminders, defaults, privacy, export/wipe | Toggle quiet local reminders |
 
-## Data model
+## Supporting flows
 
-Friend: id, name, optional note, contact method, priority (1–5), last-met date, created date.
+- Add/edit friend (manual or single-contact picker)
+- Friend profile (rhythm, last met, plans)
+- Add availability (presets, recurring, one-time)
+- Create plan (multi-friend picker → details)
+- Plan detail (editable invite text, per-friend status, share sheet)
+- Move friend to another availability
 
-Free block: recurring (day of week + start/end minutes) or one-off (date + start/end minutes).
+## Data model (on-device only)
 
-Invitation: friend id, start/end, idea, place, editable invitation text, status (`to_send` | `sent` | `accepted` | `canceled` | `moved`), created/updated dates.
+- **Friend**: name (required), optional photo/phone/share method, catch-up rhythm, last met
+- **Availability**: recurring or one-off rule; occurrences can be skipped without deleting the rule
+- **Plan**: time from availability, title/activity/place/note, friends with invite statuses
+- **Settings**: notification prefs, default duration, first day of week, time format
 
-## Invitation statuses
+## Invite statuses (per friend)
 
-Owner-tracked (friends never need the app): after they reply in text/WhatsApp, you mark accepted, canceled, or move the invite to another free slot.
+Not invited · Waiting · Yes · Maybe · No · New time · Moved
 
-## First invitation
+## Plan statuses
 
-Hey {name} — I’d love to catch up. Want to {idea} at {place}? I’m free {weekday, date · time range}.
+Draft · Waiting · It’s on · Needs another time · Done · Cancelled
+
+## Invitations
+
+Editable plain text; share via the OS share sheet. After sharing, ask “Mark as invited?” — the OS cannot confirm delivery.
+
+## Explicitly not V1
+
+No backend, accounts, social feed, chat, maps, event discovery, bulk contact sync, or auto-sent messages.
 
 ## Decision rule
 
-If a feature makes it easier to put a friend on your free calendar this week, consider it. If it makes Vemos more like a social network or event directory, leave it out.
+If a feature makes it easier to pick a free time and invite someone this week, consider it. If it makes So, When? a social network or event directory, leave it out.

@@ -1,146 +1,133 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, ScrollView, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '../components/Avatar';
 import { Button } from '../components/Button';
-import { Screen } from '../components/Screen';
-import { lastSeenLine, priorityLabel } from '../domain/time';
-import { color, radius, space, type } from '../foundation';
+import { Card } from '../components/Card';
+import { PressableScale } from '../components/PressableScale';
+import {
+  catchUpLabel,
+  catchUpStatus,
+  lastMetLabel,
+} from '../domain/model';
+import { pickOneContact } from '../services/contacts';
 import { useApp } from '../state/AppProvider';
+import { cn } from '../ui/cn';
 
 export function FriendsScreen() {
-  const { data, sortedFriends, openAddFriend, openEditFriend } = useApp();
+  const { data, openAddFriend, openFriendProfile, saveFriend } = useApp();
+
+  const onPickContact = async () => {
+    if (Platform.OS === 'web') {
+      Alert.alert('Contacts', 'Contact picking works on Android and iOS. You can still add manually.');
+      openAddFriend();
+      return;
+    }
+    try {
+      const picked = await pickOneContact();
+      if (!picked) {
+        return;
+      }
+      await saveFriend({
+        name: picked.name,
+        photoUri: picked.photoUri,
+        phone: picked.phone,
+        shareMethod: 'whatsapp',
+        rhythm: 'monthly',
+        customDays: 45,
+        lastMetAt: null,
+      });
+    } catch {
+      Alert.alert('Could not open contacts', 'You can still add a friend manually.');
+      openAddFriend();
+    }
+  };
 
   return (
-    <Screen>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.wordmark}>Friends</Text>
-          <Text style={styles.subtitle}>Last met · priority to meet</Text>
+    <SafeAreaView className="flex-1 bg-canvas font-sans" edges={['top', 'left', 'right']}>
+      <View className="flex-1 px-5 pt-4">
+        <View className="mb-4 gap-1">
+          <Text className="font-sans-bold text-[28px] tracking-[-1px] text-ink">Friends</Text>
+          <Text className="text-caption text-muted">The people worth making time for</Text>
         </View>
-        <Button
-          label="Add"
-          variant="secondary"
-          onPress={() => openAddFriend('friends')}
-          style={styles.addButton}
-        />
-      </View>
 
-      {data.friends.length === 0 ? (
-        <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>No friends yet</Text>
-          <Text style={styles.emptyBody}>
-            Add a few people. Higher priority means they show up first when you tap a free slot.
+        <View className="mb-4 gap-2">
+          <Button label="Add manually" onPress={openAddFriend} />
+          <Button label="Choose from contacts" variant="secondary" onPress={() => void onPickContact()} />
+          <Text className="text-center text-caption text-muted">
+            We only copy the one contact you pick. Everything stays on your phone.
           </Text>
-          <Button label="Add a friend" onPress={() => openAddFriend('friends')} />
         </View>
-      ) : (
-        <View style={styles.list}>
-          {sortedFriends.map((friend) => (
-            <Pressable
-              key={friend.id}
-              accessibilityRole="button"
-              accessibilityLabel={`Edit ${friend.name}`}
-              onPress={() => openEditFriend(friend.id)}
-              style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
-            >
-              <Avatar name={friend.name} size={48} />
-              <View style={styles.copy}>
-                <Text style={styles.name}>{friend.name}</Text>
-                <Text style={styles.meta}>{lastSeenLine(friend.lastMetAt)}</Text>
-                <Text style={styles.priority}>
-                  Priority: {priorityLabel(friend.priority)}
-                </Text>
+
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerClassName="gap-3 pb-6">
+          {data.friends.length === 0 ? (
+            <Card className="items-center gap-3 py-8">
+              <View className="h-14 flex-row items-center">
+                <View className="h-12 w-12 rounded-full bg-primary-soft" />
+                <View className="-ml-4 h-14 w-14 rounded-full bg-coral-soft" />
+                <View className="-ml-4 h-12 w-12 rounded-full bg-[#F6EEDC]" />
               </View>
-              <Text style={styles.chevron}>›</Text>
-            </Pressable>
-          ))}
-        </View>
-      )}
-    </Screen>
+              <Text className="font-sans-bold text-section text-ink">No friends yet</Text>
+              <Text className="text-center text-body text-muted">
+                Add someone you’d like to see more often. A name is enough —
+                phone and rhythm can wait.
+              </Text>
+            </Card>
+          ) : (
+            data.friends
+              .slice()
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map((friend) => {
+                const status = catchUpStatus(friend);
+                const nextPlan = data.plans.find((plan) => (
+                  plan.status !== 'done'
+                  && plan.status !== 'cancelled'
+                  && plan.friends.some((item) => item.friendId === friend.id && item.status !== 'moved')
+                  && new Date(plan.startAt).getTime() >= Date.now()
+                ));
+
+                return (
+                  <PressableScale
+                    key={friend.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${friend.name}, ${catchUpLabel(status, friend)}`}
+                    onPress={() => openFriendProfile(friend.id)}
+                  >
+                    <Card className="flex-row items-center gap-3 p-4">
+                      <Avatar name={friend.name} photoUri={friend.photoUri} size={52} />
+                      <View className="flex-1 gap-0.5">
+                        <Text className="font-sans-bold text-body text-ink">{friend.name}</Text>
+                        <Text className="text-caption text-muted">{lastMetLabel(friend.lastMetAt)}</Text>
+                        {nextPlan ? (
+                          <Text className="text-caption text-primary">Next: {nextPlan.title}</Text>
+                        ) : null}
+                      </View>
+                      <View
+                        className={cn(
+                          'rounded-full px-3 py-1',
+                          status === 'due' && 'bg-coral-soft',
+                          status === 'soon' && 'bg-primary-soft',
+                          status === 'none' && 'bg-canvas',
+                        )}
+                      >
+                        <Text
+                          className={cn(
+                            'text-caption font-sans-semibold',
+                            status === 'due' && 'text-coral-deep',
+                            status === 'soon' && 'text-primary',
+                            status === 'none' && 'text-muted',
+                          )}
+                        >
+                          {catchUpLabel(status, friend)}
+                        </Text>
+                      </View>
+                    </Card>
+                  </PressableScale>
+                );
+              })
+          )}
+        </ScrollView>
+      </View>
+    </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: space.xl,
-    gap: space.md,
-  },
-  wordmark: {
-    color: color.ink,
-    fontSize: type.title,
-    fontWeight: '700',
-    letterSpacing: -0.6,
-  },
-  subtitle: {
-    color: color.muted,
-    fontSize: type.body,
-    marginTop: 2,
-  },
-  addButton: {
-    minWidth: 88,
-    paddingHorizontal: space.lg,
-  },
-  empty: {
-    backgroundColor: color.surface,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: color.border,
-    padding: space.xl,
-    gap: space.md,
-  },
-  emptyTitle: {
-    color: color.ink,
-    fontSize: type.section,
-    fontWeight: '700',
-  },
-  emptyBody: {
-    color: color.muted,
-    fontSize: type.body,
-    lineHeight: 24,
-  },
-  list: {
-    gap: space.md,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.md,
-    backgroundColor: color.surface,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: color.border,
-    padding: space.lg,
-    minHeight: 72,
-  },
-  pressed: {
-    backgroundColor: color.softTeal,
-  },
-  copy: {
-    flex: 1,
-    gap: 2,
-  },
-  name: {
-    color: color.ink,
-    fontSize: type.body,
-    fontWeight: '700',
-  },
-  meta: {
-    color: color.muted,
-    fontSize: type.caption,
-    lineHeight: 18,
-  },
-  priority: {
-    color: color.primary,
-    fontSize: type.caption,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  chevron: {
-    color: color.muted,
-    fontSize: 28,
-    lineHeight: 28,
-  },
-});

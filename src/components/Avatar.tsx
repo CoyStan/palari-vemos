@@ -1,48 +1,46 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, Text, View } from 'react-native';
+
+import { cn } from '../ui/cn';
 
 type Props = {
   name: string;
+  photoUri?: string | null;
   size?: number;
 };
 
 const PALETTES = [
-  { bg: '#E7F5F4', fg: '#147A78' },
-  { bg: '#FFF0EC', fg: '#C96B5A' },
-  { bg: '#EEF2FF', fg: '#4F46E5' },
-  { bg: '#F0FDF4', fg: '#15803D' },
-  { bg: '#FFF7ED', fg: '#C2410C' },
+  'bg-primary-soft text-primary',
+  'bg-coral-soft text-coral-deep',
+  'bg-success-soft text-success',
+  'bg-[#F6EEDC] text-[#8A6D3B]',
+  'bg-[#ECE9F6] text-[#5B5680]',
 ];
 
-export function Avatar({ name, size = 48 }: Props) {
+export function Avatar({ name, photoUri, size = 48 }: Props) {
   const initial = (name.trim()[0] ?? '?').toUpperCase();
-  const palette = PALETTES[name.trim().length % PALETTES.length] ?? PALETTES[0];
+  const palette = PALETTES[name.trim().length % PALETTES.length] ?? PALETTES[0]!;
+  const [bg, fg] = palette.split(' ');
+
+  if (photoUri) {
+    return (
+      <Image
+        source={{ uri: photoUri }}
+        accessibilityLabel={`${name} photo`}
+        className="rounded-full bg-border"
+        style={{ width: size, height: size, borderRadius: size / 2 }}
+      />
+    );
+  }
 
   return (
     <View
       accessibilityLabel={`${name} avatar`}
-      style={[
-        styles.circle,
-        {
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          backgroundColor: palette.bg,
-        },
-      ]}
+      className={cn('items-center justify-center', bg)}
+      style={{ width: size, height: size, borderRadius: size / 2 }}
     >
-      <Text style={[styles.initial, { color: palette.fg, fontSize: size * 0.4 }]}>
+      <Text className={cn('font-sans-bold', fg)} style={{ fontSize: size * 0.4 }}>
         {initial}
       </Text>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  circle: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  initial: {
-    fontWeight: '700',
-  },
-});

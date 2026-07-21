@@ -1,39 +1,47 @@
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import './global.css';
+
+import {
+  Quicksand_400Regular,
+  Quicksand_500Medium,
+  Quicksand_600SemiBold,
+  Quicksand_700Bold,
+  useFonts,
+} from '@expo-google-fonts/quicksand';
 import { StatusBar } from 'expo-status-bar';
+import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { BottomNav } from './src/components/BottomNav';
+import { MuiPickerProvider } from './src/components/MuiPickerProvider';
+import { ScreenTransition } from './src/components/ScreenTransition';
 import { color } from './src/foundation';
-import { CalendarScreen } from './src/screens/CalendarScreen';
-import { FreeTimesScreen } from './src/screens/FreeTimesScreen';
+import { AddAvailabilityScreen } from './src/screens/AddAvailabilityScreen';
+import { AvailabilityScreen } from './src/screens/AvailabilityScreen';
+import { CreatePlanScreen } from './src/screens/CreatePlanScreen';
 import { FriendFormScreen } from './src/screens/FriendFormScreen';
+import { FriendProfileScreen } from './src/screens/FriendProfileScreen';
 import { FriendsScreen } from './src/screens/FriendsScreen';
-import { InviteDetailScreen } from './src/screens/InviteDetailScreen';
-import { MoveInviteScreen } from './src/screens/MoveInviteScreen';
-import { PickFriendScreen } from './src/screens/PickFriendScreen';
+import { MoveFriendScreen } from './src/screens/MoveFriendScreen';
+import { OnboardingScreen } from './src/screens/OnboardingScreen';
+import { PlanDetailScreen } from './src/screens/PlanDetailScreen';
+import { SettingsScreen } from './src/screens/SettingsScreen';
 import { WelcomeScreen } from './src/screens/WelcomeScreen';
+import { WhenScreen } from './src/screens/WhenScreen';
 import { AppProvider, useApp } from './src/state/AppProvider';
 
 function Root() {
-  const {
-    ready,
-    screen,
-    tab,
-    editingFriendId,
-    goCalendar,
-    goFriends,
-  } = useApp();
+  const { ready, screen, tab, goWhen, goFriends, goSettings } = useApp();
 
   if (!ready || screen === 'loading') {
     return (
-      <View style={styles.loading}>
+      <View className="flex-1 items-center justify-center bg-canvas">
         <ActivityIndicator size="large" color={color.primary} />
         <StatusBar style="dark" />
       </View>
     );
   }
 
-  const showTabs = screen === 'calendar' || screen === 'friends';
+  const showTabs = screen === 'when' || screen === 'friends' || screen === 'settings';
 
   let content = null;
   switch (screen) {
@@ -44,37 +52,52 @@ function Root() {
       content = <FriendFormScreen key="create" mode="create" />;
       break;
     case 'editFriend':
-      content = <FriendFormScreen key={editingFriendId ?? 'edit'} mode="edit" />;
+      content = <FriendFormScreen key="edit" mode="edit" />;
       break;
-    case 'freeTimes':
-      content = <FreeTimesScreen />;
+    case 'friendProfile':
+      content = <FriendProfileScreen />;
       break;
-    case 'pickFriend':
-      content = <PickFriendScreen />;
+    case 'addAvailability':
+      content = <AddAvailabilityScreen />;
       break;
-    case 'inviteDetail':
-      content = <InviteDetailScreen />;
+    case 'availability':
+      content = <AvailabilityScreen />;
       break;
-    case 'moveInvite':
-      content = <MoveInviteScreen />;
+    case 'onboarding':
+      content = <OnboardingScreen />;
+      break;
+    case 'createPlan':
+      content = <CreatePlanScreen />;
+      break;
+    case 'planDetail':
+      content = <PlanDetailScreen />;
+      break;
+    case 'moveFriend':
+      content = <MoveFriendScreen />;
       break;
     case 'friends':
       content = <FriendsScreen />;
       break;
-    case 'calendar':
+    case 'settings':
+      content = <SettingsScreen />;
+      break;
+    case 'when':
     default:
-      content = <CalendarScreen />;
+      content = <WhenScreen />;
       break;
   }
 
   return (
-    <View style={styles.root}>
-      <View style={styles.main}>{content}</View>
+    <View className="flex-1 bg-canvas font-sans">
+      <View className="flex-1">
+        <ScreenTransition screenKey={screen}>{content}</ScreenTransition>
+      </View>
       {showTabs ? (
         <BottomNav
           active={tab}
-          onCalendar={goCalendar}
+          onWhen={goWhen}
           onFriends={goFriends}
+          onSettings={goSettings}
         />
       ) : null}
       <StatusBar style="dark" />
@@ -83,27 +106,29 @@ function Root() {
 }
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    Quicksand_400Regular,
+    Quicksand_500Medium,
+    Quicksand_600SemiBold,
+    Quicksand_700Bold,
+  });
+
+  if (!fontsLoaded) {
+    return (
+      <View className="flex-1 items-center justify-center bg-canvas">
+        <ActivityIndicator size="large" color={color.primary} />
+        <StatusBar style="dark" />
+      </View>
+    );
+  }
+
   return (
     <SafeAreaProvider>
-      <AppProvider>
-        <Root />
-      </AppProvider>
+      <MuiPickerProvider>
+        <AppProvider>
+          <Root />
+        </AppProvider>
+      </MuiPickerProvider>
     </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: color.canvas,
-  },
-  main: {
-    flex: 1,
-  },
-  loading: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: color.canvas,
-  },
-});
