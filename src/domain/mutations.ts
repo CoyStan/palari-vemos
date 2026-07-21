@@ -4,7 +4,7 @@ import {
   intervalsOverlap,
   proposePlanWindow,
   slotConflictsWithPlans,
-} from './model';
+} from "./model";
 import type {
   AppData,
   AppSettings,
@@ -19,7 +19,7 @@ import type {
   PlanStatus,
   ShareMethod,
   SkippedOccurrence,
-} from './types';
+} from "./types";
 
 export type FriendInput = {
   name: string;
@@ -31,9 +31,12 @@ export type FriendInput = {
   lastMetAt: string | null;
 };
 
-export type AvailabilityInput = Omit<AvailabilityRule, 'id' | 'createdAt'>;
+export type AvailabilityInput = Omit<AvailabilityRule, "id" | "createdAt">;
 
-export function updateSettings(data: AppData, patch: Partial<AppSettings>): AppData {
+export function updateSettings(
+  data: AppData,
+  patch: Partial<AppSettings>,
+): AppData {
   return { ...data, settings: { ...data.settings, ...patch } };
 }
 
@@ -46,26 +49,26 @@ export function upsertFriend(
   const name = input.name.trim();
   const now = new Date().toISOString();
   if (friendId) {
-    const friends = data.friends.map((friend) => (
+    const friends = data.friends.map((friend) =>
       friend.id === friendId
         ? {
-          ...friend,
-          name,
-          photoUri: input.photoUri,
-          phone: input.phone.trim(),
-          shareMethod: input.shareMethod,
-          rhythm: input.rhythm,
-          customDays: input.customDays,
-          lastMetAt: input.lastMetAt,
-        }
-        : friend
-    ));
+            ...friend,
+            name,
+            photoUri: input.photoUri,
+            phone: input.phone.trim(),
+            shareMethod: input.shareMethod,
+            rhythm: input.rhythm,
+            customDays: input.customDays,
+            lastMetAt: input.lastMetAt,
+          }
+        : friend,
+    );
     const friend = friends.find((item) => item.id === friendId)!;
     return { data: { ...data, friends }, friend };
   }
 
   const friend: Friend = {
-    id: createId('friend'),
+    id: createId("friend"),
     name,
     photoUri: input.photoUri,
     phone: input.phone.trim(),
@@ -85,32 +88,78 @@ export function upsertFriend(
   };
 }
 
+export function isTerminalPlan(plan: Plan): boolean {
+  return plan.status === "done" || plan.status === "cancelled";
+}
+
+/** Active participants (not moved). */
+export function activePlanParticipants(plan: Plan): PlanFriend[] {
+  return plan.friends.filter(
+    (item) => item.status !== "moved" && !item.friendId.startsWith("gone_"),
+  );
+}
+
+export function plansAffectedByFriendDeletion(
+  data: AppData,
+  friendId: string,
+): Plan[] {
+  return data.plans.filter(
+    (plan) =>
+      !isTerminalPlan(plan) &&
+      plan.friends.some(
+        (item) => item.friendId === friendId && item.status !== "moved",
+      ),
+  );
+}
+
 export function removeFriend(data: AppData, friendId: string): AppData {
   const friend = data.friends.find((item) => item.id === friendId);
-  const snapshot = friend?.name ?? 'Friend';
+  const snapshot = friend?.name ?? "Friend";
+  const now = new Date().toISOString();
   return {
     ...data,
     friends: data.friends.filter((item) => item.id !== friendId),
     plans: data.plans.map((plan) => {
-      const kept = plan.friends.filter((item) => item.friendId !== friendId);
       const removed = plan.friends.find((item) => item.friendId === friendId);
-      const friends = plan.status === 'done' && removed
-        ? [
-          ...kept,
-          {
-            ...removed,
-            friendId: `gone_${friendId}`,
-            displayNameSnapshot: removed.displayNameSnapshot ?? snapshot,
-          },
-        ]
-        : kept;
+      if (!removed) return plan;
+
+      if (isTerminalPlan(plan)) {
+        return {
+          ...plan,
+          friends: plan.friends.map((item) =>
+            item.friendId === friendId
+              ? {
+                  ...item,
+                  friendId: `gone_${friendId}`,
+                  displayNameSnapshot: item.displayNameSnapshot ?? snapshot,
+                }
+              : item,
+          ),
+          attendedFriendIds: plan.attendedFriendIds.map((id) =>
+            id === friendId ? `gone_${friendId}` : id,
+          ),
+          updatedAt: now,
+        };
+      }
+
+      const remaining = plan.friends.filter(
+        (item) => item.friendId !== friendId,
+      );
+      const activeLeft = remaining.filter((item) => item.status !== "moved");
+      if (activeLeft.length === 0) {
+        return {
+          ...plan,
+          friends: remaining,
+          status: "cancelled" as const,
+          cancelledAt: now,
+          updatedAt: now,
+        };
+      }
       return {
         ...plan,
-        friends,
-        status: plan.status === 'done' || plan.status === 'cancelled'
-          ? plan.status
-          : computePlanStatus(friends),
-        updatedAt: new Date().toISOString(),
+        friends: remaining,
+        status: computePlanStatus(remaining),
+        updatedAt: now,
       };
     }),
   };
@@ -123,7 +172,7 @@ export function addAvailabilityRule(
 ): AppData {
   const rule: AvailabilityRule = {
     ...input,
-    id: createId('avail'),
+    id: createId("avail"),
     createdAt: new Date().toISOString(),
   };
   return { ...data, availability: [...data.availability, rule] };
@@ -136,9 +185,22 @@ export function updateAvailabilityRule(
 ): AppData {
   return {
     ...data,
-    availability: data.availability.map((rule) => (
-      rule.id === ruleId ? { ...rule, ...input } : rule
-    )),
+    availability: data.availability.map((rule) => {
+      if (rule.id !== ruleId) return rule;
+      // Preserve original startDate for biweekly/recurring cadence continuity unless explicitly oneoff date change.
+      const startDate =
+        input.kind === "oneoff"
+          ? (input.oneOffDate ?? input.startDate)
+          : rule.startDate;
+      const endDate =
+        input.kind === "oneoff" ? null : (input.endDate ?? rule.endDate);
+      return {
+        ...rule,
+        ...input,
+        startDate,
+        endDate,
+      };
+    }),
   };
 }
 
@@ -147,7 +209,9 @@ export function skipOccurrenceOnce(
   ruleId: string,
   date: string,
 ): AppData {
-  if (data.skipped.some((item) => item.ruleId === ruleId && item.date === date)) {
+  if (
+    data.skipped.some((item) => item.ruleId === ruleId && item.date === date)
+  ) {
     return data;
   }
   return { ...data, skipped: [...data.skipped, { ruleId, date }] };
@@ -160,7 +224,9 @@ export function unskipOccurrence(
 ): AppData {
   return {
     ...data,
-    skipped: data.skipped.filter((item) => !(item.ruleId === ruleId && item.date === date)),
+    skipped: data.skipped.filter(
+      (item) => !(item.ruleId === ruleId && item.date === date),
+    ),
   };
 }
 
@@ -179,9 +245,9 @@ export function setAvailabilityEnabledState(
 ): AppData {
   return {
     ...data,
-    availability: data.availability.map((rule) => (
-      rule.id === ruleId ? { ...rule, enabled } : rule
-    )),
+    availability: data.availability.map((rule) =>
+      rule.id === ruleId ? { ...rule, enabled } : rule,
+    ),
   };
 }
 
@@ -197,7 +263,7 @@ export function completeOnboardingState(
   let next: AppData = { ...data, onboardingComplete: true };
   if (input.friend?.name.trim()) {
     const friend: Friend = {
-      id: createId('friend'),
+      id: createId("friend"),
       name: input.friend.name.trim(),
       photoUri: input.friend.photoUri,
       phone: input.friend.phone.trim(),
@@ -212,7 +278,7 @@ export function completeOnboardingState(
   if (input.availability) {
     const rule: AvailabilityRule = {
       ...input.availability,
-      id: createId('avail'),
+      id: createId("avail"),
       createdAt: now,
     };
     next = { ...next, availability: [...next.availability, rule] };
@@ -226,7 +292,7 @@ export function lookAroundFirst(data: AppData): AppData {
 
 export type CreatePlanResult =
   | { ok: true; data: AppData; plan: Plan }
-  | { ok: false; reason: 'missing' | 'conflict'; message: string };
+  | { ok: false; reason: "missing" | "conflict"; message: string };
 
 export function createPlanState(
   data: AppData,
@@ -237,7 +303,11 @@ export function createPlanState(
   excludePlanId?: string | null,
 ): CreatePlanResult {
   if (selectedFriendIds.length === 0) {
-    return { ok: false, reason: 'missing', message: 'Pick at least one friend.' };
+    return {
+      ok: false,
+      reason: "missing",
+      message: "Pick at least one friend.",
+    };
   }
 
   const window = proposePlanWindow(
@@ -246,14 +316,16 @@ export function createPlanState(
     data.settings.defaultDurationMinutes,
   );
 
-  if (slotConflictsWithPlans(window.startAt, window.endAt, data.plans, {
-    availabilityKey: selectedSlot.key,
-    excludePlanId: excludePlanId ?? null,
-  })) {
+  if (
+    slotConflictsWithPlans(window.startAt, window.endAt, data.plans, {
+      availabilityKey: selectedSlot.key,
+      excludePlanId: excludePlanId ?? null,
+    })
+  ) {
     return {
       ok: false,
-      reason: 'conflict',
-      message: 'That time was just taken. Pick another free slot.',
+      reason: "conflict",
+      message: "That time was just taken. Pick another free slot.",
     };
   }
 
@@ -261,27 +333,28 @@ export function createPlanState(
   const names = selectedFriendIds
     .map((id) => data.friends.find((friend) => friend.id === id)?.name)
     .filter(Boolean) as string[];
-  const title = input.title.trim()
-    || (names.length === 1
+  const title =
+    input.title.trim() ||
+    (names.length === 1
       ? `Catch up with ${names[0]}`
       : names.length > 1
-        ? `Catch up with ${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
-        : 'Catch up');
+        ? `Catch up with ${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`
+        : "Catch up");
 
   const planFriends: PlanFriend[] = selectedFriendIds.map((friendId) => {
     const friend = data.friends.find((item) => item.id === friendId);
     return {
       friendId,
-      status: 'not_invited',
+      status: "not_invited",
       invitationText: buildInviteText({
-        name: friend?.name ?? 'there',
+        name: friend?.name ?? "there",
         startAt: window.startAt,
         endAt: window.endAt,
         activity: input.activity,
         place: input.place,
         timeFormat24h: data.settings.timeFormat24h,
       }),
-      inviteTone: 'warm',
+      inviteTone: "warm",
       invitationCustomized: false,
       sentAt: null,
       displayNameSnapshot: friend?.name ?? null,
@@ -289,7 +362,7 @@ export function createPlanState(
   });
 
   const plan: Plan = {
-    id: createId('plan'),
+    id: createId("plan"),
     title,
     activity: input.activity.trim(),
     place: input.place.trim(),
@@ -298,9 +371,10 @@ export function createPlanState(
     endAt: window.endAt,
     availabilityKey: selectedSlot.key,
     friends: planFriends,
-    status: 'draft',
-    memoryNote: '',
+    status: "draft",
+    memoryNote: "",
     memoryPhotoUri: null,
+    attendedFriendIds: [],
     completedAt: null,
     cancelledAt: null,
     createdAt: now,
@@ -323,10 +397,10 @@ export function setInviteStatusState(
   return {
     ...data,
     plans: data.plans.map((plan) => {
-      if (plan.id !== planId) return plan;
-      const friends = plan.friends.map((item) => (
-        item.friendId === friendId ? { ...item, status } : item
-      ));
+      if (plan.id !== planId || isTerminalPlan(plan)) return plan;
+      const friends = plan.friends.map((item) =>
+        item.friendId === friendId ? { ...item, status } : item,
+      );
       return {
         ...plan,
         friends,
@@ -347,14 +421,14 @@ export function updateInvitationTextState(
   return {
     ...data,
     plans: data.plans.map((plan) => {
-      if (plan.id !== planId) return plan;
+      if (plan.id !== planId || isTerminalPlan(plan)) return plan;
       return {
         ...plan,
-        friends: plan.friends.map((item) => (
+        friends: plan.friends.map((item) =>
           item.friendId === friendId
             ? { ...item, invitationText, invitationCustomized: customized }
-            : item
-        )),
+            : item,
+        ),
         updatedAt: new Date().toISOString(),
       };
     }),
@@ -371,15 +445,16 @@ export function markInviteSentState(
   return {
     ...data,
     plans: data.plans.map((plan) => {
-      if (plan.id !== planId) return plan;
+      if (plan.id !== planId || isTerminalPlan(plan)) return plan;
       const friends = plan.friends.map((item) => {
         if (item.friendId !== friendId) return item;
         if (!sent) {
-          return { ...item, status: 'not_invited' as const, sentAt: null };
+          return { ...item, status: "not_invited" as const, sentAt: null };
         }
         return {
           ...item,
-          status: item.status === 'not_invited' ? 'waiting' as const : item.status,
+          status:
+            item.status === "not_invited" ? ("waiting" as const) : item.status,
           sentAt: now,
         };
       });
@@ -399,20 +474,29 @@ export function markPlanDoneState(
   attendedFriendIds: string[],
 ): AppData {
   const plan = data.plans.find((item) => item.id === planId);
-  if (!plan) return data;
-  const attended = new Set(attendedFriendIds);
+  if (!plan || isTerminalPlan(plan)) return data;
+  const attended = attendedFriendIds.filter((id) =>
+    plan.friends.some((item) => item.friendId === id),
+  );
+  const attendedSet = new Set(attended);
   const eventDay = plan.startAt;
   const now = new Date().toISOString();
   return {
     ...data,
-    friends: data.friends.map((friend) => (
-      attended.has(friend.id) ? { ...friend, lastMetAt: eventDay } : friend
-    )),
-    plans: data.plans.map((item) => (
+    friends: data.friends.map((friend) =>
+      attendedSet.has(friend.id) ? { ...friend, lastMetAt: eventDay } : friend,
+    ),
+    plans: data.plans.map((item) =>
       item.id === planId
-        ? { ...item, status: 'done' as const, completedAt: now, updatedAt: now }
-        : item
-    )),
+        ? {
+            ...item,
+            status: "done" as const,
+            attendedFriendIds: attended,
+            completedAt: now,
+            updatedAt: now,
+          }
+        : item,
+    ),
   };
 }
 
@@ -420,11 +504,165 @@ export function markPlanCancelledState(data: AppData, planId: string): AppData {
   const now = new Date().toISOString();
   return {
     ...data,
-    plans: data.plans.map((plan) => (
-      plan.id === planId
-        ? { ...plan, status: 'cancelled' as const, cancelledAt: now, updatedAt: now }
-        : plan
-    )),
+    plans: data.plans.map((plan) =>
+      plan.id === planId && !isTerminalPlan(plan)
+        ? {
+            ...plan,
+            status: "cancelled" as const,
+            cancelledAt: now,
+            updatedAt: now,
+          }
+        : plan,
+    ),
+  };
+}
+
+export type MoveFriendResult =
+  | { ok: true; data: AppData; newPlan: Plan; sourceCancelled: boolean }
+  | {
+      ok: false;
+      reason: "missing" | "conflict" | "same_slot" | "terminal";
+      message: string;
+    };
+
+export function moveFriendToSlotState(
+  data: AppData,
+  sourcePlanId: string,
+  friendId: string,
+  slot: ConcreteSlot,
+  createId: (prefix: string) => string,
+): MoveFriendResult {
+  const source = data.plans.find((plan) => plan.id === sourcePlanId);
+  if (!source) {
+    return {
+      ok: false,
+      reason: "missing",
+      message: "That plan is no longer available.",
+    };
+  }
+  if (isTerminalPlan(source)) {
+    return {
+      ok: false,
+      reason: "terminal",
+      message: "Completed or cancelled plans can’t be moved.",
+    };
+  }
+  if (
+    !source.friends.some(
+      (item) => item.friendId === friendId && item.status !== "moved",
+    )
+  ) {
+    return {
+      ok: false,
+      reason: "missing",
+      message: "That friend is not on this plan.",
+    };
+  }
+
+  const window = proposePlanWindow(
+    slot.startAt,
+    slot.endAt,
+    data.settings.defaultDurationMinutes,
+  );
+
+  if (source.startAt === window.startAt && source.endAt === window.endAt) {
+    return {
+      ok: false,
+      reason: "same_slot",
+      message: "Pick a different time.",
+    };
+  }
+
+  const activeOthers = activePlanParticipants(source).filter(
+    (item) => item.friendId !== friendId,
+  );
+  const sourceWillCancel = activeOthers.length === 0;
+  const excludePlanId = sourceWillCancel ? source.id : null;
+
+  if (
+    slotConflictsWithPlans(window.startAt, window.endAt, data.plans, {
+      availabilityKey: slot.key,
+      excludePlanId,
+    })
+  ) {
+    return {
+      ok: false,
+      reason: "conflict",
+      message: "That time was just taken. Pick another free slot.",
+    };
+  }
+
+  const friend = data.friends.find((item) => item.id === friendId);
+  const nowIso = new Date().toISOString();
+  const remaining = source.friends.map((item) =>
+    item.friendId === friendId ? { ...item, status: "moved" as const } : item,
+  );
+  const sourceCancelled = sourceWillCancel;
+  const newPlan: Plan = {
+    id: createId("plan"),
+    title: friend ? `Catch up with ${friend.name}` : "Catch up",
+    activity: source.activity,
+    place: source.place,
+    note: source.note,
+    startAt: window.startAt,
+    endAt: window.endAt,
+    availabilityKey: slot.key,
+    friends: [
+      {
+        friendId,
+        status: "not_invited",
+        invitationText: buildInviteText({
+          name: friend?.name ?? "there",
+          startAt: window.startAt,
+          endAt: window.endAt,
+          activity: source.activity,
+          place: source.place,
+          timeFormat24h: data.settings.timeFormat24h,
+        }),
+        inviteTone: "warm",
+        invitationCustomized: false,
+        sentAt: null,
+        displayNameSnapshot: friend?.name ?? null,
+      },
+    ],
+    status: "draft",
+    memoryNote: "",
+    memoryPhotoUri: null,
+    attendedFriendIds: [],
+    completedAt: null,
+    cancelledAt: null,
+    createdAt: nowIso,
+    updatedAt: nowIso,
+  };
+
+  return {
+    ok: true,
+    sourceCancelled,
+    newPlan,
+    data: {
+      ...data,
+      plans: [
+        newPlan,
+        ...data.plans.map((plan) => {
+          if (plan.id !== source.id) return plan;
+          if (sourceCancelled) {
+            return {
+              ...plan,
+              friends: remaining,
+              status: "cancelled" as const,
+              cancelledAt: nowIso,
+              updatedAt: nowIso,
+            };
+          }
+          return {
+            ...plan,
+            friends: remaining,
+            status: computePlanStatus(remaining),
+            updatedAt: nowIso,
+          };
+        }),
+      ],
+    },
   };
 }
 

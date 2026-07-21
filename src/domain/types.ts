@@ -1,44 +1,21 @@
-export type ShareMethod =
-  | 'whatsapp'
-  | 'sms'
-  | 'telegram'
-  | 'message'
-  | 'other';
+export type ShareMethod = "whatsapp" | "sms" | "telegram" | "message" | "other";
 
 export type CatchUpRhythm =
-  | 'weekly'
-  | 'monthly'
-  | 'quarterly'
-  | 'custom'
-  | 'none';
+  "weekly" | "monthly" | "quarterly" | "custom" | "none";
 
-export type FriendCatchUpStatus = 'due' | 'soon' | 'none';
+export type FriendCatchUpStatus = "due" | "soon" | "none";
 
 export type InviteStatus =
-  | 'not_invited'
-  | 'waiting'
-  | 'yes'
-  | 'maybe'
-  | 'no'
-  | 'new_time'
-  | 'moved';
+  "not_invited" | "waiting" | "yes" | "maybe" | "no" | "new_time" | "moved";
 
 export type PlanStatus =
-  | 'draft'
-  | 'waiting'
-  | 'on'
-  | 'needs_time'
-  | 'done'
-  | 'cancelled';
+  "draft" | "waiting" | "on" | "needs_time" | "done" | "cancelled";
 
-export type AvailabilityKind = 'recurring' | 'oneoff';
+export type AvailabilityKind = "recurring" | "oneoff";
 
-export type Recurrence =
-  | 'weekly'
-  | 'biweekly'
-  | 'daily';
+export type Recurrence = "weekly" | "biweekly" | "daily";
 
-export type InviteTone = 'warm' | 'casual' | 'playful';
+export type InviteTone = "warm" | "casual" | "playful";
 
 export type Friend = {
   id: string;
@@ -104,6 +81,8 @@ export type Plan = {
   /** After-the-moment capture, filled once the plan is done. */
   memoryNote: string;
   memoryPhotoUri: string | null;
+  /** Explicit attendees chosen when marking Done; never invented on migrate. */
+  attendedFriendIds: string[];
   completedAt: string | null;
   cancelledAt: string | null;
   createdAt: string;
