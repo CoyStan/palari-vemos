@@ -56,4 +56,4 @@ We may update this policy when the product’s data practices change. The effect
 
 ## Contact
 
-Questions about this policy: privacy@palari.io. For Google Play, host the same policy from docs/privacy-policy.html at a public HTTPS URL and paste that URL into Play Console. That public URL is not deployed yet.
+Questions about this policy: privacy@palari.io.

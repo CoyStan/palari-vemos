@@ -55,7 +55,7 @@ export const PRIVACY_POLICY_SECTIONS: { title: string; body: string }[] = [
   },
   {
     title: "Contact",
-    body: `Questions about this policy: ${PRIVACY_CONTACT_EMAIL}. For Google Play, host the same policy from docs/privacy-policy.html at a public HTTPS URL and paste that URL into Play Console. That public URL is not deployed yet.`,
+    body: `Questions about this policy: ${PRIVACY_CONTACT_EMAIL}.`,
   },
 ];
 
