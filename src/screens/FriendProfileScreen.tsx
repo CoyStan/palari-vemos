@@ -1,16 +1,16 @@
-import { useMemo, useState } from 'react';
-import { Alert, Platform, Pressable, Text, View } from 'react-native';
+import { useMemo, useState } from "react";
+import { Alert, Platform, Pressable, Text, View } from "react-native";
 import DateTimePicker, {
   type DateTimePickerEvent,
-} from '@react-native-community/datetimepicker';
+} from "@react-native-community/datetimepicker";
 
-import { AnimatedDialog } from '../components/AnimatedDialog';
-import { Avatar } from '../components/Avatar';
-import { Button } from '../components/Button';
-import { Card } from '../components/Card';
-import { PressableScale } from '../components/PressableScale';
-import { Screen } from '../components/Screen';
-import { ScreenHeader } from '../components/ScreenHeader';
+import { AnimatedDialog } from "../components/AnimatedDialog";
+import { Avatar } from "../components/Avatar";
+import { Button } from "../components/Button";
+import { Card } from "../components/Card";
+import { PressableScale } from "../components/PressableScale";
+import { Screen } from "../components/Screen";
+import { ScreenHeader } from "../components/ScreenHeader";
 import {
   catchUpLabel,
   catchUpStatus,
@@ -20,12 +20,12 @@ import {
   RHYTHM_OPTIONS,
   SHARE_OPTIONS,
   suggestSlotsForScheduling,
-} from '../domain/model';
-import { formatDayHeading, startOfDay } from '../domain/time';
-import type { ConcreteSlot } from '../domain/types';
-import { hapticTick } from '../services/haptics';
-import { useApp } from '../state/AppProvider';
-import { cn } from '../ui/cn';
+} from "../domain/model";
+import { formatDayHeading, startOfDay } from "../domain/time";
+import type { ConcreteSlot } from "../domain/types";
+import { hapticTick } from "../services/haptics";
+import { useApp } from "../state/AppProvider";
+import { cn } from "../ui/cn";
 
 export function FriendProfileScreen() {
   const {
@@ -56,7 +56,13 @@ export function FriendProfileScreen() {
         durationMinutes: data.settings.defaultDurationMinutes,
       },
     );
-  }, [activeFriend, data.availability, data.skipped, data.plans, data.settings.defaultDurationMinutes]);
+  }, [
+    activeFriend,
+    data.availability,
+    data.skipped,
+    data.plans,
+    data.settings.defaultDurationMinutes,
+  ]);
 
   if (!activeFriend) {
     return (
@@ -68,22 +74,33 @@ export function FriendProfileScreen() {
   }
 
   const friend = activeFriend;
-  const rhythm = RHYTHM_OPTIONS.find((option) => option.value === friend.rhythm)?.label ?? 'No schedule';
-  const share = SHARE_OPTIONS.find((option) => option.value === friend.shareMethod)?.label ?? 'Other';
+  const rhythm =
+    RHYTHM_OPTIONS.find((option) => option.value === friend.rhythm)?.label ??
+    "No schedule";
+  const share =
+    SHARE_OPTIONS.find((option) => option.value === friend.shareMethod)
+      ?.label ?? "Other";
   const upcoming = data.plans
-    .filter((plan) => (
-      plan.status !== 'done'
-      && plan.status !== 'cancelled'
-      && plan.friends.some((item) => item.friendId === friend.id && item.status !== 'moved')
-      && new Date(plan.startAt).getTime() >= Date.now()
-    ))
-    .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+    .filter(
+      (plan) =>
+        plan.status !== "done" &&
+        plan.status !== "cancelled" &&
+        plan.friends.some(
+          (item) => item.friendId === friend.id && item.status !== "moved",
+        ) &&
+        new Date(plan.startAt).getTime() >= Date.now(),
+    )
+    .sort(
+      (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
+    );
   const goodTimes = data.plans
-    .filter((plan) => (
-      plan.status === 'done'
-      && plan.friends.some((item) => item.friendId === friend.id)
-    ))
-    .sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime())
+    .filter(
+      (plan) =>
+        plan.status === "done" && plan.attendedFriendIds.includes(friend.id),
+    )
+    .sort(
+      (a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime(),
+    )
     .slice(0, 5);
 
   const onPickSuggestion = (slot: ConcreteSlot) => {
@@ -101,12 +118,12 @@ export function FriendProfileScreen() {
   };
 
   const onDatePickerChange = (event: DateTimePickerEvent, date?: Date) => {
-    if (Platform.OS === 'android' && event.type === 'set' && date) {
+    if (Platform.OS === "android" && event.type === "set" && date) {
       void logCaughtUp(friend.id, startOfDay(date).toISOString());
       setPickDateOpen(false);
       return;
     }
-    if (event.type === 'dismissed') {
+    if (event.type === "dismissed") {
       setPickDateOpen(false);
       return;
     }
@@ -116,18 +133,17 @@ export function FriendProfileScreen() {
   };
 
   const onWeCaughtUp = () => {
-    Alert.alert(
-      'When did you catch up?',
-      undefined,
-      [
-        { text: 'Today', onPress: onCaughtUpToday },
-        { text: 'Pick date', onPress: () => {
+    Alert.alert("When did you catch up?", undefined, [
+      { text: "Today", onPress: onCaughtUpToday },
+      {
+        text: "Pick date",
+        onPress: () => {
           setPickedDate(startOfDay(new Date()));
           setPickDateOpen(true);
-        } },
-        { text: 'Not sure', style: 'cancel' },
-      ],
-    );
+        },
+      },
+      { text: "Not sure", style: "cancel" },
+    ]);
   };
 
   return (
@@ -136,21 +152,23 @@ export function FriendProfileScreen() {
 
       <View className="items-center gap-2 py-1">
         <Avatar name={friend.name} photoUri={friend.photoUri} size={72} />
-        <Text className="text-body text-muted">{lastMetLabel(friend.lastMetAt)}</Text>
+        <Text className="text-body text-muted">
+          {lastMetLabel(friend.lastMetAt)}
+        </Text>
         <View
           className={cn(
-            'items-center justify-center rounded-full px-3 py-1.5',
-            catchUpStatus(friend) === 'due' && 'bg-coral-soft',
-            catchUpStatus(friend) === 'soon' && 'bg-primary-soft',
-            catchUpStatus(friend) === 'none' && 'bg-canvas',
+            "items-center justify-center rounded-full px-3 py-1.5",
+            catchUpStatus(friend) === "due" && "bg-coral-soft",
+            catchUpStatus(friend) === "soon" && "bg-primary-soft",
+            catchUpStatus(friend) === "none" && "bg-canvas",
           )}
         >
           <Text
             className={cn(
-              'text-center text-caption font-sans-semibold leading-5',
-              catchUpStatus(friend) === 'due' && 'text-coral-deep',
-              catchUpStatus(friend) === 'soon' && 'text-primary',
-              catchUpStatus(friend) === 'none' && 'text-muted',
+              "text-center text-caption font-sans-semibold leading-5",
+              catchUpStatus(friend) === "due" && "text-coral-deep",
+              catchUpStatus(friend) === "soon" && "text-primary",
+              catchUpStatus(friend) === "none" && "text-muted",
             )}
           >
             {catchUpLabel(catchUpStatus(friend), friend)}
@@ -176,7 +194,7 @@ export function FriendProfileScreen() {
                 </Text>
                 <Text className="mt-1 font-sans-bold text-section text-ink">
                   {formatClock(slot.startMinutes, data.settings.timeFormat24h)}
-                  {' – '}
+                  {" – "}
                   {formatClock(slot.endMinutes, data.settings.timeFormat24h)}
                 </Text>
                 <Text className="mt-1 text-body text-primary">
@@ -191,14 +209,20 @@ export function FriendProfileScreen() {
               No free windows yet. Add when you’re usually free, then come back
               to pick a time with {friend.name}.
             </Text>
-            <Button label="Add free time" variant="secondary" onPress={openAddAvailability} />
+            <Button
+              label="Add free time"
+              variant="secondary"
+              onPress={openAddAvailability}
+            />
           </Card>
         )}
       </View>
 
       {upcoming.length > 0 ? (
         <View className="gap-2">
-          <Text className="font-sans-bold text-section text-ink">Coming up</Text>
+          <Text className="font-sans-bold text-section text-ink">
+            Coming up
+          </Text>
           {upcoming.map((plan) => (
             <Button
               key={plan.id}
@@ -212,17 +236,30 @@ export function FriendProfileScreen() {
 
       {goodTimes.length > 0 ? (
         <View className="gap-2">
-          <Text className="font-sans-bold text-section text-ink">Good times</Text>
+          <Text className="font-sans-bold text-section text-ink">
+            Good times
+          </Text>
           {goodTimes.map((plan) => (
-            <Card key={plan.id} className="px-4 py-3">
-              <Text className="font-sans-semibold text-body text-ink">{plan.title}</Text>
-              <Text className="text-caption text-muted">
-                {formatDayHeading(new Date(plan.startAt))}
-              </Text>
-              {plan.memoryNote ? (
-                <Text className="mt-1 text-body text-muted">{plan.memoryNote}</Text>
-              ) : null}
-            </Card>
+            <PressableScale
+              key={plan.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Open ${plan.title}`}
+              onPress={() => openPlanDetail(plan.id)}
+            >
+              <Card className="min-h-[44px] px-4 py-3">
+                <Text className="font-sans-semibold text-body text-ink">
+                  {plan.title}
+                </Text>
+                <Text className="text-caption text-muted">
+                  {formatDayHeading(new Date(plan.startAt))}
+                </Text>
+                {plan.memoryNote ? (
+                  <Text className="mt-1 text-body text-muted">
+                    {plan.memoryNote}
+                  </Text>
+                ) : null}
+              </Card>
+            </PressableScale>
           ))}
         </View>
       ) : null}
@@ -238,7 +275,9 @@ export function FriendProfileScreen() {
           className="min-h-[44px] flex-row items-center justify-between rounded-control border border-border bg-surface px-4 py-3"
         >
           <Text className="font-sans-semibold text-body text-ink">Details</Text>
-          <Text className="text-caption text-muted">{detailsOpen ? 'Hide' : 'Show'}</Text>
+          <Text className="text-caption text-muted">
+            {detailsOpen ? "Hide" : "Show"}
+          </Text>
         </Pressable>
         {detailsOpen ? (
           <Card className="gap-1 p-5">
@@ -257,8 +296,10 @@ export function FriendProfileScreen() {
         accessibilityLabel="Pick catch-up date"
       >
         <View className="gap-3 px-5 pb-4">
-          <Text className="font-sans-bold text-section text-ink">When did you catch up?</Text>
-          {Platform.OS === 'ios' ? (
+          <Text className="font-sans-bold text-section text-ink">
+            When did you catch up?
+          </Text>
+          {Platform.OS === "ios" ? (
             <>
               <DateTimePicker
                 value={pickedDate}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   BackHandler,
   Modal,
@@ -7,19 +7,19 @@ import {
   Text,
   useWindowDimensions,
   View,
-} from 'react-native';
+} from "react-native";
 import Animated, {
   Easing,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
-} from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+} from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Icon } from './Icon';
-import { color, radius } from '../foundation';
-import { useReduceMotion } from '../ui/useReduceMotion';
+import { Icon } from "./Icon";
+import { color, radius } from "../foundation";
+import { useReduceMotion } from "../ui/useReduceMotion";
 
 type Props = {
   visible: boolean;
@@ -44,8 +44,8 @@ export function AnimatedDialog({
   onClose,
   onExited,
   children,
-  accessibilityLabel = 'Dialog',
-  closeLabel = 'Close',
+  accessibilityLabel = "Dialog",
+  closeLabel = "Close",
 }: Props) {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
@@ -90,10 +90,13 @@ export function AnimatedDialog({
       return undefined;
     }
 
-    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      onClose();
-      return true;
-    });
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        onClose();
+        return true;
+      },
+    );
 
     return () => subscription.remove();
   }, [mounted, onClose]);
@@ -149,7 +152,7 @@ export function AnimatedDialog({
             {
               marginHorizontal: 12,
               marginBottom: 12,
-              overflow: 'hidden',
+              overflow: "hidden",
               borderRadius: radius.sheet,
               borderWidth: 1,
               borderColor: color.border,
@@ -169,8 +172,15 @@ export function AnimatedDialog({
               hitSlop={8}
               className="absolute right-4 min-h-[44px] min-w-[44px] flex-row items-center justify-center gap-1 rounded-full active:bg-primary-soft"
             >
-              <Icon name="x" size={18} color={color.muted} accessibilityLabel="" />
-              <Text className="font-sans-semibold text-caption text-muted">{closeLabel}</Text>
+              <Icon
+                name="x"
+                size={18}
+                color={color.muted}
+                accessibilityLabel=""
+              />
+              <Text className="font-sans-semibold text-caption text-muted">
+                {closeLabel}
+              </Text>
             </Pressable>
           </View>
           {children}

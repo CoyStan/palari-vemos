@@ -1,9 +1,9 @@
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import dayjs, { type Dayjs } from 'dayjs';
-import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import dayjs, { type Dayjs } from "dayjs";
+import { useState } from "react";
+import { Text, View } from "react-native";
 
-import { formatDateKey } from '../domain/time';
+import { formatDateKey } from "../domain/time";
 
 type Props = {
   label: string;
@@ -36,12 +36,12 @@ export function DateSlotPicker({ label, date, onChange }: Props) {
         slotProps={{
           textField: {
             fullWidth: true,
-            size: 'medium',
+            size: "medium",
             onClick: () => setOpen(true),
             readOnly: true,
           },
           popper: {
-            placement: 'bottom-start',
+            placement: "bottom-start",
           },
         }}
       />

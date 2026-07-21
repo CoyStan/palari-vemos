@@ -1,13 +1,13 @@
-import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
+import * as Notifications from "expo-notifications";
+import { Platform } from "react-native";
 
-import { buildReminderSpecs } from '../domain/reminders';
-import type { AppData } from '../domain/types';
+import { buildReminderSpecs } from "../domain/reminders";
+import type { AppData } from "../domain/types";
 
-export { buildReminderSpecs } from '../domain/reminders';
-export type { ReminderSpec } from '../domain/reminders';
+export { buildReminderSpecs } from "../domain/reminders";
+export type { ReminderSpec } from "../domain/reminders";
 
-export const REMINDER_CHANNEL_ID = 'sowhen-quiet';
+export const REMINDER_CHANNEL_ID = "sowhen-quiet";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -21,17 +21,17 @@ Notifications.setNotificationHandler({
 let latestRevision = 0;
 
 export async function ensureReminderChannel(): Promise<void> {
-  if (Platform.OS !== 'android') return;
+  if (Platform.OS !== "android") return;
   await Notifications.setNotificationChannelAsync(REMINDER_CHANNEL_ID, {
-    name: 'Quiet reminders',
+    name: "Quiet reminders",
     importance: Notifications.AndroidImportance.DEFAULT,
     bypassDnd: false,
-    description: 'Optional plan and catch-up nudges from So, When?',
+    description: "Optional plan and catch-up nudges from So, When?",
   });
 }
 
 export async function ensureNotificationPermission(): Promise<boolean> {
-  if (Platform.OS === 'web') {
+  if (Platform.OS === "web") {
     return false;
   }
   await ensureReminderChannel();
@@ -44,7 +44,7 @@ export async function ensureNotificationPermission(): Promise<boolean> {
 }
 
 export async function cancelAllReminders(): Promise<void> {
-  if (Platform.OS === 'web') return;
+  if (Platform.OS === "web") return;
   try {
     await Notifications.cancelAllScheduledNotificationsAsync();
   } catch {
@@ -52,11 +52,14 @@ export async function cancelAllReminders(): Promise<void> {
   }
 }
 
-export async function rescheduleReminders(data: AppData, revision?: number): Promise<void> {
-  if (Platform.OS === 'web') {
+export async function rescheduleReminders(
+  data: AppData,
+  revision?: number,
+): Promise<void> {
+  if (Platform.OS === "web") {
     return;
   }
-  if (typeof revision === 'number') {
+  if (typeof revision === "number") {
     if (revision < latestRevision) return;
     latestRevision = revision;
   }
@@ -76,19 +79,24 @@ export async function rescheduleReminders(data: AppData, revision?: number): Pro
     return;
   }
 
-  if (typeof revision === 'number' && revision < latestRevision) {
+  if (typeof revision === "number" && revision < latestRevision) {
     return;
   }
 
   const specs = buildReminderSpecs(data, new Date());
   for (const spec of specs) {
-    const seconds = Math.max(1, Math.round((spec.triggerAt.getTime() - Date.now()) / 1000));
+    const seconds = Math.max(
+      1,
+      Math.round((spec.triggerAt.getTime() - Date.now()) / 1000),
+    );
     try {
       await Notifications.scheduleNotificationAsync({
         content: {
           title: spec.title,
           body: spec.body,
-          ...(Platform.OS === 'android' ? { channelId: REMINDER_CHANNEL_ID } : {}),
+          ...(Platform.OS === "android"
+            ? { channelId: REMINDER_CHANNEL_ID }
+            : {}),
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,

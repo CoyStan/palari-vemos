@@ -1,9 +1,9 @@
-import { TimePicker } from '@mui/x-date-pickers/TimePicker';
-import dayjs, { type Dayjs } from 'dayjs';
-import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { TimePicker } from "@mui/x-date-pickers/TimePicker";
+import dayjs, { type Dayjs } from "dayjs";
+import { useState } from "react";
+import { Text, View } from "react-native";
 
-import { minutesToDate } from '../domain/pickerTime';
+import { minutesToDate } from "../domain/pickerTime";
 
 type Props = {
   label: string;
@@ -25,7 +25,12 @@ function dayjsToMinutes(value: Dayjs | null): number {
 }
 
 /** MUI X TimePicker — web only; opens clock popup on tap (no text editing). */
-export function TimeSlotPicker({ label, minutes, onChange, timeFormat24h = false }: Props) {
+export function TimeSlotPicker({
+  label,
+  minutes,
+  onChange,
+  timeFormat24h = false,
+}: Props) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -43,12 +48,12 @@ export function TimeSlotPicker({ label, minutes, onChange, timeFormat24h = false
         slotProps={{
           textField: {
             fullWidth: true,
-            size: 'medium',
+            size: "medium",
             onClick: () => setOpen(true),
             readOnly: true,
           },
           popper: {
-            placement: 'bottom-start',
+            placement: "bottom-start",
           },
         }}
       />

@@ -1,12 +1,12 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, type ReactNode } from "react";
 import Animated, {
   Easing,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
-} from 'react-native-reanimated';
+} from "react-native-reanimated";
 
-import { useReduceMotion } from '../ui/useReduceMotion';
+import { useReduceMotion } from "../ui/useReduceMotion";
 
 const ENTER_MS = 220;
 

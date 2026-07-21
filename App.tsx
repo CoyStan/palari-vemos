@@ -1,4 +1,4 @@
-import './global.css';
+import "./global.css";
 
 import {
   Quicksand_400Regular,
@@ -6,35 +6,36 @@ import {
   Quicksand_600SemiBold,
   Quicksand_700Bold,
   useFonts,
-} from '@expo-google-fonts/quicksand';
-import { StatusBar } from 'expo-status-bar';
-import { ActivityIndicator, View } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+} from "@expo-google-fonts/quicksand";
+import { StatusBar } from "expo-status-bar";
+import { ActivityIndicator, View } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { BottomNav } from './src/components/BottomNav';
-import { MuiPickerProvider } from './src/components/MuiPickerProvider';
-import { ScreenTransition } from './src/components/ScreenTransition';
-import { color } from './src/foundation';
-import { AddAvailabilityScreen } from './src/screens/AddAvailabilityScreen';
-import { AvailabilityScreen } from './src/screens/AvailabilityScreen';
-import { CreatePlanScreen } from './src/screens/CreatePlanScreen';
-import { FriendFormScreen } from './src/screens/FriendFormScreen';
-import { FriendProfileScreen } from './src/screens/FriendProfileScreen';
-import { FriendsScreen } from './src/screens/FriendsScreen';
-import { MoveFriendScreen } from './src/screens/MoveFriendScreen';
-import { OnboardingScreen } from './src/screens/OnboardingScreen';
-import { PlanDetailScreen } from './src/screens/PlanDetailScreen';
-import { PrivacyPolicyScreen } from './src/screens/PrivacyPolicyScreen';
-import { RecoveryScreen } from './src/screens/RecoveryScreen';
-import { SettingsScreen } from './src/screens/SettingsScreen';
-import { WelcomeScreen } from './src/screens/WelcomeScreen';
-import { WhenScreen } from './src/screens/WhenScreen';
-import { AppProvider, useApp } from './src/state/AppProvider';
+import { BottomNav } from "./src/components/BottomNav";
+import { MuiPickerProvider } from "./src/components/MuiPickerProvider";
+import { SaveErrorBanner } from "./src/components/SaveErrorBanner";
+import { ScreenTransition } from "./src/components/ScreenTransition";
+import { color } from "./src/foundation";
+import { AddAvailabilityScreen } from "./src/screens/AddAvailabilityScreen";
+import { AvailabilityScreen } from "./src/screens/AvailabilityScreen";
+import { CreatePlanScreen } from "./src/screens/CreatePlanScreen";
+import { FriendFormScreen } from "./src/screens/FriendFormScreen";
+import { FriendProfileScreen } from "./src/screens/FriendProfileScreen";
+import { FriendsScreen } from "./src/screens/FriendsScreen";
+import { MoveFriendScreen } from "./src/screens/MoveFriendScreen";
+import { OnboardingScreen } from "./src/screens/OnboardingScreen";
+import { PlanDetailScreen } from "./src/screens/PlanDetailScreen";
+import { PrivacyPolicyScreen } from "./src/screens/PrivacyPolicyScreen";
+import { RecoveryScreen } from "./src/screens/RecoveryScreen";
+import { SettingsScreen } from "./src/screens/SettingsScreen";
+import { WelcomeScreen } from "./src/screens/WelcomeScreen";
+import { WhenScreen } from "./src/screens/WhenScreen";
+import { AppProvider, useApp } from "./src/state/AppProvider";
 
 function Root() {
   const { ready, screen, tab, goWhen, goFriends, goSettings } = useApp();
 
-  if (!ready || screen === 'loading') {
+  if (!ready || screen === "loading") {
     return (
       <View className="flex-1 items-center justify-center bg-canvas">
         <ActivityIndicator size="large" color={color.primary} />
@@ -43,56 +44,57 @@ function Root() {
     );
   }
 
-  const showTabs = screen === 'when' || screen === 'friends' || screen === 'settings';
+  const showTabs =
+    screen === "when" || screen === "friends" || screen === "settings";
 
   let content = null;
   switch (screen) {
-    case 'welcome':
+    case "welcome":
       content = <WelcomeScreen />;
       break;
-    case 'addFriend':
+    case "addFriend":
       content = <FriendFormScreen key="create" mode="create" />;
       break;
-    case 'editFriend':
+    case "editFriend":
       content = <FriendFormScreen key="edit" mode="edit" />;
       break;
-    case 'friendProfile':
+    case "friendProfile":
       content = <FriendProfileScreen />;
       break;
-    case 'addAvailability':
+    case "addAvailability":
       content = <AddAvailabilityScreen key="add" />;
       break;
-    case 'editAvailability':
+    case "editAvailability":
       content = <AddAvailabilityScreen key="edit" />;
       break;
-    case 'availability':
+    case "availability":
       content = <AvailabilityScreen />;
       break;
-    case 'onboarding':
+    case "onboarding":
       content = <OnboardingScreen />;
       break;
-    case 'recovery':
+    case "recovery":
       content = <RecoveryScreen />;
       break;
-    case 'createPlan':
+    case "createPlan":
       content = <CreatePlanScreen />;
       break;
-    case 'planDetail':
+    case "planDetail":
       content = <PlanDetailScreen />;
       break;
-    case 'moveFriend':
+    case "moveFriend":
       content = <MoveFriendScreen />;
       break;
-    case 'privacyPolicy':
+    case "privacyPolicy":
       content = <PrivacyPolicyScreen />;
       break;
-    case 'friends':
+    case "friends":
       content = <FriendsScreen />;
       break;
-    case 'settings':
+    case "settings":
       content = <SettingsScreen />;
       break;
-    case 'when':
+    case "when":
     default:
       content = <WhenScreen />;
       break;
@@ -111,6 +113,7 @@ function Root() {
           onSettings={goSettings}
         />
       ) : null}
+      <SaveErrorBanner />
       <StatusBar style="dark" />
     </View>
   );

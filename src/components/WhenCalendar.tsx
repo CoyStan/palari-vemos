@@ -1,14 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Pressable,
   ScrollView,
   Text,
   View,
   type LayoutChangeEvent,
-} from 'react-native';
+} from "react-native";
 
-import { formatClock, PLAN_STATUS_LABELS, slotIsBooked } from '../domain/model';
-import type { ConcreteSlot, Plan, PlanStatus } from '../domain/types';
+import { formatClock, PLAN_STATUS_LABELS, slotIsBooked } from "../domain/model";
+import type { ConcreteSlot, Plan, PlanStatus } from "../domain/types";
 import {
   DAY_END_HOUR,
   DAY_LABELS,
@@ -16,23 +16,26 @@ import {
   formatDateKey,
   formatDayTitle,
   HOUR_HEIGHT,
-} from '../domain/time';
-import { color, shadowSoft } from '../foundation';
-import { cn } from '../ui/cn';
+} from "../domain/time";
+import { color, shadowSoft } from "../foundation";
+import { cn } from "../ui/cn";
 
 const TIME_GUTTER = 52;
 
-const PLAN_CHIP: Record<PlanStatus, { bg: string; fg: string; border: string }> = {
-  draft: { bg: color.softCoral, fg: '#C96B5A', border: '#F5C4B8' },
-  waiting: { bg: color.softTeal, fg: color.primary, border: '#B7E0DD' },
-  on: { bg: '#ECFDF3', fg: color.success, border: '#A7F3C0' },
-  needs_time: { bg: color.softCoral, fg: '#C96B5A', border: '#F5C4B8' },
+const PLAN_CHIP: Record<
+  PlanStatus,
+  { bg: string; fg: string; border: string }
+> = {
+  draft: { bg: color.softCoral, fg: "#C96B5A", border: "#F5C4B8" },
+  waiting: { bg: color.softTeal, fg: color.primary, border: "#B7E0DD" },
+  on: { bg: "#ECFDF3", fg: color.success, border: "#A7F3C0" },
+  needs_time: { bg: color.softCoral, fg: "#C96B5A", border: "#F5C4B8" },
   done: { bg: color.canvas, fg: color.muted, border: color.border },
   cancelled: { bg: color.canvas, fg: color.muted, border: color.border },
 };
 
 type Props = {
-  mode: 'week' | 'day';
+  mode: "week" | "day";
   days: Date[];
   focusDate: Date;
   slots: ConcreteSlot[];
@@ -70,21 +73,22 @@ export function WhenCalendar({
   const scrollRef = useRef<ScrollView>(null);
   const todayKey = formatDateKey(new Date());
   const focusKey = formatDateKey(focusDate);
-  const visibleDays = mode === 'day' ? [focusDate] : days;
+  const visibleDays = mode === "day" ? [focusDate] : days;
   const startHour = Math.max(0, Math.min(23, dayStartHour));
   const endHour = Math.max(startHour + 1, Math.min(24, dayEndHour));
   const hours = endHour - startHour;
   const gridHeight = hours * HOUR_HEIGHT;
 
   const daysAreaWidth = Math.max(0, gridWidth - TIME_GUTTER);
-  const dayWidth = visibleDays.length > 0 ? daysAreaWidth / visibleDays.length : 0;
+  const dayWidth =
+    visibleDays.length > 0 ? daysAreaWidth / visibleDays.length : 0;
 
   const nowMinutes = useMemo(() => {
     const now = new Date();
     return now.getHours() * 60 + now.getMinutes();
   }, []);
 
-  const activePlans = plans.filter((plan) => plan.status !== 'cancelled');
+  const activePlans = plans.filter((plan) => plan.status !== "cancelled");
 
   const onLayout = (event: LayoutChangeEvent) => {
     const next = Math.round(event.nativeEvent.layout.width);
@@ -118,7 +122,10 @@ export function WhenCalendar({
         <View className="flex-1" />
       ) : (
         <>
-          <View className="flex-row border-b border-border py-2" style={{ width: gridWidth }}>
+          <View
+            className="flex-row border-b border-border py-2"
+            style={{ width: gridWidth }}
+          >
             <View style={{ width: TIME_GUTTER }} />
             <View className="flex-row" style={{ width: daysAreaWidth }}>
               {visibleDays.map((day) => {
@@ -132,7 +139,7 @@ export function WhenCalendar({
                     accessibilityLabel={formatDayTitle(day)}
                     onPress={() => {
                       onFocusDate(day);
-                      if (mode === 'week') {
+                      if (mode === "week") {
                         onSwitchToDay();
                       }
                     }}
@@ -141,23 +148,23 @@ export function WhenCalendar({
                   >
                     <Text
                       className={cn(
-                        'text-[11px] font-sans-semibold uppercase tracking-[0.4px]',
-                        isToday ? 'text-primary' : 'text-muted',
+                        "text-[11px] font-sans-semibold uppercase tracking-[0.4px]",
+                        isToday ? "text-primary" : "text-muted",
                       )}
                     >
                       {DAY_LABELS[day.getDay()]}
                     </Text>
                     <View
                       className={cn(
-                        'h-7 w-7 items-center justify-center rounded-full',
-                        isToday && 'bg-primary-soft',
-                        isFocus && !isToday && 'bg-coral-soft',
+                        "h-7 w-7 items-center justify-center rounded-full",
+                        isToday && "bg-primary-soft",
+                        isFocus && !isToday && "bg-coral-soft",
                       )}
                     >
                       <Text
                         className={cn(
-                          'text-caption font-sans-bold',
-                          isToday ? 'text-primary' : 'text-ink',
+                          "text-caption font-sans-bold",
+                          isToday ? "text-primary" : "text-ink",
                         )}
                       >
                         {day.getDate()}
@@ -175,7 +182,10 @@ export function WhenCalendar({
             contentContainerStyle={{ paddingBottom: 24, width: gridWidth }}
             showsVerticalScrollIndicator={false}
           >
-            <View className="flex-row" style={{ width: gridWidth, height: gridHeight }}>
+            <View
+              className="flex-row"
+              style={{ width: gridWidth, height: gridHeight }}
+            >
               <View style={{ width: TIME_GUTTER }}>
                 {Array.from({ length: hours }, (_, i) => {
                   const hour = startHour + i;
@@ -192,13 +202,16 @@ export function WhenCalendar({
               <View className="flex-row" style={{ width: daysAreaWidth }}>
                 {visibleDays.map((day, dayIndex) => {
                   const dateKey = formatDateKey(day);
-                  const daySlots = slots.filter((slot) => slot.date === dateKey);
+                  const daySlots = slots.filter(
+                    (slot) => slot.date === dateKey,
+                  );
                   const dayPlans = activePlans.filter(
                     (plan) => formatDateKey(new Date(plan.startAt)) === dateKey,
                   );
-                  const showNow = dateKey === todayKey
-                    && nowMinutes >= startHour * 60
-                    && nowMinutes < endHour * 60;
+                  const showNow =
+                    dateKey === todayKey &&
+                    nowMinutes >= startHour * 60 &&
+                    nowMinutes < endHour * 60;
 
                   return (
                     <View
@@ -221,7 +234,7 @@ export function WhenCalendar({
                           dayWidth={dayWidth}
                           dayStartHour={startHour}
                           booked={slotIsBooked(slot, plans)}
-                          compact={mode === 'week'}
+                          compact={mode === "week"}
                           timeFormat24h={timeFormat24h}
                           onPress={() => {
                             if (!slotIsBooked(slot, plans)) {
@@ -229,7 +242,9 @@ export function WhenCalendar({
                             }
                           }}
                           onLongPress={
-                            onSkipSlot && slot.ruleId && !slotIsBooked(slot, plans)
+                            onSkipSlot &&
+                            slot.ruleId &&
+                            !slotIsBooked(slot, plans)
                               ? () => onSkipSlot(slot)
                               : undefined
                           }
@@ -242,7 +257,7 @@ export function WhenCalendar({
                           plan={plan}
                           dayWidth={dayWidth}
                           dayStartHour={startHour}
-                          compact={mode === 'week'}
+                          compact={mode === "week"}
                           label={planTitle(plan, friends)}
                           onPress={() => onOpenPlan(plan.id)}
                         />
@@ -253,7 +268,9 @@ export function WhenCalendar({
                           pointerEvents="none"
                           className="absolute left-0 right-0 z-[3] flex-row items-center"
                           style={{
-                            top: ((nowMinutes - startHour * 60) / 60) * HOUR_HEIGHT,
+                            top:
+                              ((nowMinutes - startHour * 60) / 60) *
+                              HOUR_HEIGHT,
                           }}
                         >
                           <View className="-ml-[3px] h-2 w-2 rounded-full bg-coral" />
@@ -276,14 +293,17 @@ export function WhenCalendar({
   );
 }
 
-function planTitle(plan: Plan, friends: { id: string; name: string }[]): string {
+function planTitle(
+  plan: Plan,
+  friends: { id: string; name: string }[],
+): string {
   if (plan.title.trim()) {
     return plan.title;
   }
   const names = plan.friends
     .map((item) => friends.find((friend) => friend.id === item.friendId)?.name)
     .filter(Boolean);
-  return names[0] ?? 'Plan';
+  return names[0] ?? "Plan";
 }
 
 function FreeBlockView({
@@ -311,8 +331,25 @@ function FreeBlockView({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Free ${formatClock(slot.startMinutes, timeFormat24h)} to ${formatClock(slot.endMinutes, timeFormat24h)}. Long press to skip this time.`}
-      accessibilityHint={onLongPress ? 'Long press to skip this occurrence' : undefined}
+      accessibilityLabel={`Free ${formatClock(slot.startMinutes, timeFormat24h)} to ${formatClock(slot.endMinutes, timeFormat24h)}${onLongPress ? ". Double-tap and use Skip action to skip this time" : ""}`}
+      accessibilityHint={
+        onLongPress
+          ? "Activate Skip action to hide this occurrence once"
+          : undefined
+      }
+      accessibilityActions={
+        onLongPress
+          ? [
+              { name: "activate" },
+              { name: "skip", label: "Skip this free time" },
+            ]
+          : undefined
+      }
+      onAccessibilityAction={(event) => {
+        if (event.nativeEvent.actionName === "skip") {
+          onLongPress?.();
+        }
+      }}
       disabled={booked}
       onPress={onPress}
       onLongPress={onLongPress}
@@ -326,8 +363,15 @@ function FreeBlockView({
         opacity: booked ? 0.4 : 1,
       }}
     >
-      <Text className="text-[10px] font-sans-bold text-primary" numberOfLines={compact ? 2 : 3}>
-        {booked ? 'Booked' : compact ? 'Free' : `Free · ${formatClock(slot.startMinutes, timeFormat24h)}`}
+      <Text
+        className="text-[10px] font-sans-bold text-primary"
+        numberOfLines={compact ? 2 : 3}
+      >
+        {booked
+          ? "Booked"
+          : compact
+            ? "Free"
+            : `Free · ${formatClock(slot.startMinutes, timeFormat24h)}`}
       </Text>
     </Pressable>
   );
@@ -353,7 +397,9 @@ function PlanBlockView({
   const startMinutes = start.getHours() * 60 + start.getMinutes();
   const endMinutes = end.getHours() * 60 + end.getMinutes();
   const top = ((startMinutes - dayStartHour * 60) / 60) * HOUR_HEIGHT;
-  const height = ((Math.max(endMinutes, startMinutes + 30) - startMinutes) / 60) * HOUR_HEIGHT;
+  const height =
+    ((Math.max(endMinutes, startMinutes + 30) - startMinutes) / 60) *
+    HOUR_HEIGHT;
   const chip = PLAN_CHIP[plan.status];
 
   return (
@@ -371,11 +417,19 @@ function PlanBlockView({
         borderColor: chip.border,
       }}
     >
-      <Text className="font-sans-bold text-[11px]" style={{ color: chip.fg }} numberOfLines={1}>
+      <Text
+        className="font-sans-bold text-[11px]"
+        style={{ color: chip.fg }}
+        numberOfLines={1}
+      >
         {label}
       </Text>
       {!compact || height > 40 ? (
-        <Text className="mt-0.5 text-[10px] opacity-90" style={{ color: chip.fg }} numberOfLines={1}>
+        <Text
+          className="mt-0.5 text-[10px] opacity-90"
+          style={{ color: chip.fg }}
+          numberOfLines={1}
+        >
           {PLAN_STATUS_LABELS[plan.status]}
         </Text>
       ) : null}

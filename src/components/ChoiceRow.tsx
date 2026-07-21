@@ -1,6 +1,6 @@
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from "react-native";
 
-import { cn } from '../ui/cn';
+import { cn } from "../ui/cn";
 
 type Option<T extends string | number> = {
   value: T;
@@ -35,14 +35,14 @@ export function ChoiceRow<T extends string | number>({
               accessibilityLabel={option.label}
               onPress={() => onChange(option.value)}
               className={cn(
-                'min-h-[52px] justify-center rounded-control border bg-surface px-4 py-3 active:opacity-85',
-                selected ? 'border-primary bg-primary-soft' : 'border-border',
+                "min-h-[52px] justify-center rounded-control border bg-surface px-4 py-3 active:opacity-85",
+                selected ? "border-primary bg-primary-soft" : "border-border",
               )}
             >
               <Text
                 className={cn(
-                  'text-body font-semibold',
-                  selected ? 'text-primary' : 'text-ink',
+                  "text-body font-semibold",
+                  selected ? "text-primary" : "text-ink",
                 )}
               >
                 {option.label}
@@ -50,8 +50,8 @@ export function ChoiceRow<T extends string | number>({
               {option.hint ? (
                 <Text
                   className={cn(
-                    'mt-0.5 text-caption',
-                    selected ? 'text-primary' : 'text-muted',
+                    "mt-0.5 text-caption",
+                    selected ? "text-primary" : "text-muted",
                   )}
                 >
                   {option.hint}

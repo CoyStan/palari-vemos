@@ -1,13 +1,13 @@
 import DateTimePicker, {
   type DateTimePickerEvent,
-} from '@react-native-community/datetimepicker';
-import { useState } from 'react';
-import { Platform, Pressable, Text, View } from 'react-native';
+} from "@react-native-community/datetimepicker";
+import { useState } from "react";
+import { Platform, Pressable, Text, View } from "react-native";
 
-import { formatClock } from '../domain/model';
-import { dateToMinutes, minutesToDate } from '../domain/pickerTime';
-import { hapticTick } from '../services/haptics';
-import { cn } from '../ui/cn';
+import { formatClock } from "../domain/model";
+import { dateToMinutes, minutesToDate } from "../domain/pickerTime";
+import { hapticTick } from "../services/haptics";
+import { cn } from "../ui/cn";
 
 type Props = {
   label: string;
@@ -27,10 +27,10 @@ export function TimeSlotPicker({
   const value = minutesToDate(minutes);
 
   const onPickerChange = (event: DateTimePickerEvent, date?: Date) => {
-    if (Platform.OS === 'android') {
+    if (Platform.OS === "android") {
       setOpen(false);
     }
-    if (event.type === 'dismissed' || !date) {
+    if (event.type === "dismissed" || !date) {
       return;
     }
     onChange(dateToMinutes(date));
@@ -47,7 +47,7 @@ export function TimeSlotPicker({
           setOpen(true);
         }}
         className={cn(
-          'min-h-[52px] justify-center rounded-control border border-border bg-surface px-4 py-3 active:bg-primary-soft',
+          "min-h-[52px] justify-center rounded-control border border-border bg-surface px-4 py-3 active:bg-primary-soft",
         )}
       >
         <Text className="font-sans-semibold text-body text-ink">
@@ -60,19 +60,21 @@ export function TimeSlotPicker({
           value={value}
           mode="time"
           is24Hour={timeFormat24h}
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          display={Platform.OS === "ios" ? "spinner" : "default"}
           onChange={onPickerChange}
         />
       ) : null}
 
-      {Platform.OS === 'ios' && open ? (
+      {Platform.OS === "ios" && open ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Done choosing time"
           onPress={() => setOpen(false)}
           className="min-h-[44px] items-center justify-center rounded-full bg-primary-soft px-4 py-2"
         >
-          <Text className="font-sans-semibold text-caption text-primary">Done</Text>
+          <Text className="font-sans-semibold text-caption text-primary">
+            Done
+          </Text>
         </Pressable>
       ) : null}
     </View>

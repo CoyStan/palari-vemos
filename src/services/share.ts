@@ -1,9 +1,9 @@
-import { Linking, Platform, Share } from 'react-native';
+import { Linking, Platform, Share } from "react-native";
 
-import type { ShareMethod } from '../domain/types';
+import type { ShareMethod } from "../domain/types";
 
 function digitsOnly(phone: string): string {
-  return phone.replace(/\D/g, '');
+  return phone.replace(/\D/g, "");
 }
 
 /**
@@ -21,10 +21,10 @@ export async function shareInviteMessage(input: {
   }
 
   const encoded = encodeURIComponent(message);
-  const digits = digitsOnly(input.phone ?? '');
+  const digits = digitsOnly(input.phone ?? "");
 
   try {
-    if (input.method === 'whatsapp') {
+    if (input.method === "whatsapp") {
       const url = digits
         ? `https://wa.me/${digits}?text=${encoded}`
         : `https://wa.me/?text=${encoded}`;
@@ -32,8 +32,8 @@ export async function shareInviteMessage(input: {
       return true;
     }
 
-    if (input.method === 'sms' || input.method === 'message') {
-      const separator = Platform.OS === 'ios' ? '&' : '?';
+    if (input.method === "sms" || input.method === "message") {
+      const separator = Platform.OS === "ios" ? "&" : "?";
       const url = digits
         ? `sms:${digits}${separator}body=${encoded}`
         : `sms:${separator}body=${encoded}`;
@@ -41,7 +41,7 @@ export async function shareInviteMessage(input: {
       return true;
     }
 
-    if (input.method === 'telegram') {
+    if (input.method === "telegram") {
       await Linking.openURL(`https://t.me/share/url?url=&text=${encoded}`);
       return true;
     }

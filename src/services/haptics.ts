@@ -1,11 +1,11 @@
-import * as Haptics from 'expo-haptics';
-import { Platform } from 'react-native';
+import * as Haptics from "expo-haptics";
+import { Platform } from "react-native";
 
 /**
  * Quiet tactile feedback for the moments that matter (design-system:
  * motion dial 4/10 — felt, not flashy). No-op on web/unsupported.
  */
-const supported = Platform.OS === 'ios' || Platform.OS === 'android';
+const supported = Platform.OS === "ios" || Platform.OS === "android";
 
 /** Light tick — selections, toggles, chip presses. */
 export function hapticTick(): void {

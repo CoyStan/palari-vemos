@@ -1,5 +1,5 @@
-import { Contact } from 'expo-contacts';
-import { Platform } from 'react-native';
+import { Contact } from "expo-contacts";
+import { Platform } from "react-native";
 
 export type PickedContact = {
   name: string;
@@ -12,7 +12,7 @@ export type PickedContact = {
  * Does not request broad contacts permission or upload the address book.
  */
 export async function pickOneContact(): Promise<PickedContact | null> {
-  if (Platform.OS === 'web') {
+  if (Platform.OS === "web") {
     return null;
   }
 
@@ -34,7 +34,7 @@ export async function pickOneContact(): Promise<PickedContact | null> {
 
   return {
     name,
-    phone: phones[0]?.number?.trim() ?? '',
+    phone: phones[0]?.number?.trim() ?? "",
     photoUri: image,
   };
 }
