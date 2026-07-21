@@ -5,8 +5,10 @@ import { AnimatedDialog } from '../components/AnimatedDialog';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Icon } from '../components/Icon';
+import { PressableScale } from '../components/PressableScale';
 import { Screen } from '../components/Screen';
 import { ScreenHeader } from '../components/ScreenHeader';
+import { formatClock } from '../domain/model';
 import { DAY_LABELS } from '../domain/time';
 import type { AvailabilityRule } from '../domain/types';
 import { color } from '../foundation';
@@ -14,29 +16,30 @@ import { hapticTick } from '../services/haptics';
 import { useApp } from '../state/AppProvider';
 import { cn } from '../ui/cn';
 
-function formatTime(minutes: number): string {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  const suffix = h < 12 ? 'AM' : 'PM';
-  const display = h === 0 ? 12 : h > 12 ? h - 12 : h;
-  return m === 0 ? `${display} ${suffix}` : `${display}:${m.toString().padStart(2, '0')} ${suffix}`;
-}
-
-function formatRuleSummary(rule: AvailabilityRule): string {
+function formatRuleSummary(rule: AvailabilityRule, timeFormat24h: boolean): string {
   if (rule.kind === 'oneoff') {
-    return `One-time · ${formatTime(rule.startMinutes)} – ${formatTime(rule.endMinutes)}`;
+    const date = rule.oneOffDate ?? rule.startDate;
+    return `One-time · ${date} · ${formatClock(rule.startMinutes, timeFormat24h)} – ${formatClock(rule.endMinutes, timeFormat24h)}`;
   }
   const days = rule.daysOfWeek.map((d) => DAY_LABELS[d]).join(', ');
   const freq = rule.recurrence === 'biweekly' ? 'every 2 wks' : 'weekly';
-  return `${days} · ${formatTime(rule.startMinutes)} – ${formatTime(rule.endMinutes)} · ${freq}`;
+  return `${days} · ${formatClock(rule.startMinutes, timeFormat24h)} – ${formatClock(rule.endMinutes, timeFormat24h)} · ${freq}`;
 }
 
 export function AvailabilityScreen() {
-  const { data, goBack, openAddAvailability, setAvailabilityEnabled, deleteAvailability } = useApp();
+  const {
+    data,
+    goBack,
+    openAddAvailability,
+    openEditAvailability,
+    setAvailabilityEnabled,
+    deleteAvailability,
+  } = useApp();
   const [pendingDelete, setPendingDelete] = useState<AvailabilityRule | null>(null);
 
   const recurring = data.availability.filter((r) => r.kind === 'recurring');
   const oneoffs = data.availability.filter((r) => r.kind === 'oneoff');
+  const timeFormat24h = data.settings.timeFormat24h;
 
   const onToggle = (rule: AvailabilityRule) => {
     hapticTick();
@@ -49,6 +52,52 @@ export function AvailabilityScreen() {
       setPendingDelete(null);
     }
   };
+
+  const renderRuleCard = (rule: AvailabilityRule, showPause: boolean) => (
+    <Card key={rule.id} className="flex-row items-center gap-2 p-4">
+      <PressableScale
+        accessibilityRole="button"
+        accessibilityLabel={`Edit ${rule.label}`}
+        onPress={() => openEditAvailability(rule.id)}
+        className="min-h-[44px] flex-1 justify-center"
+      >
+        <Text className="font-sans-semibold text-body text-ink">{rule.label}</Text>
+        <Text className="mt-0.5 text-caption text-muted">{formatRuleSummary(rule, timeFormat24h)}</Text>
+        {!rule.enabled ? (
+          <Text className="mt-1 text-caption italic text-muted">
+            Paused — won’t appear in your timeline
+          </Text>
+        ) : null}
+      </PressableScale>
+
+      {showPause ? (
+        <Pressable
+          accessibilityRole="switch"
+          accessibilityState={{ checked: rule.enabled }}
+          accessibilityLabel={rule.enabled ? `Pause ${rule.label}` : `Resume ${rule.label}`}
+          onPress={() => onToggle(rule)}
+          className={cn(
+            'h-8 w-[52px] items-center justify-center rounded-full',
+            rule.enabled ? 'bg-primary' : 'bg-border',
+          )}
+        >
+          <View
+            className="h-6 w-6 rounded-full bg-white"
+            style={{ transform: [{ translateX: rule.enabled ? 12 : -12 }] }}
+          />
+        </Pressable>
+      ) : null}
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Delete ${rule.label}`}
+        onPress={() => { hapticTick(); setPendingDelete(rule); }}
+        className="h-10 w-10 items-center justify-center"
+      >
+        <Icon name="trash-2" size={18} color={color.muted} />
+      </Pressable>
+    </Card>
+  );
 
   return (
     <Screen contentClassName="gap-5">
@@ -67,69 +116,14 @@ export function AvailabilityScreen() {
       {recurring.length > 0 ? (
         <View className="gap-2">
           <Text className="font-sans-bold text-section text-ink">Recurring</Text>
-          {recurring.map((rule) => (
-            <Card key={rule.id} className="gap-3 p-4">
-              <View className="flex-row items-center gap-2">
-                <View className="flex-1">
-                  <Text className="font-sans-semibold text-body text-ink">{rule.label}</Text>
-                  <Text className="mt-0.5 text-caption text-muted">{formatRuleSummary(rule)}</Text>
-                </View>
-
-                {/* Pause / resume toggle */}
-                <Pressable
-                  accessibilityRole="switch"
-                  accessibilityState={{ checked: rule.enabled }}
-                  accessibilityLabel={rule.enabled ? `Pause ${rule.label}` : `Resume ${rule.label}`}
-                  onPress={() => onToggle(rule)}
-                  className={cn(
-                    'h-8 w-[52px] items-center justify-center rounded-full',
-                    rule.enabled ? 'bg-primary' : 'bg-border',
-                  )}
-                >
-                  <View
-                    className="h-6 w-6 rounded-full bg-white"
-                    style={{ transform: [{ translateX: rule.enabled ? 12 : -12 }] }}
-                  />
-                </Pressable>
-
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Delete ${rule.label}`}
-                  onPress={() => { hapticTick(); setPendingDelete(rule); }}
-                  className="h-10 w-10 items-center justify-center"
-                >
-                  <Icon name="trash-2" size={18} color={color.muted} />
-                </Pressable>
-              </View>
-              {!rule.enabled ? (
-                <Text className="text-caption text-muted italic">
-                  Paused — won't appear in your timeline
-                </Text>
-              ) : null}
-            </Card>
-          ))}
+          {recurring.map((rule) => renderRuleCard(rule, true))}
         </View>
       ) : null}
 
       {oneoffs.length > 0 ? (
         <View className="gap-2">
           <Text className="font-sans-bold text-section text-ink">One-time</Text>
-          {oneoffs.map((rule) => (
-            <Card key={rule.id} className="flex-row items-center gap-2 p-4">
-              <View className="flex-1">
-                <Text className="font-sans-semibold text-body text-ink">{rule.label}</Text>
-                <Text className="mt-0.5 text-caption text-muted">{formatRuleSummary(rule)}</Text>
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Delete ${rule.label}`}
-                onPress={() => { hapticTick(); setPendingDelete(rule); }}
-                className="h-10 w-10 items-center justify-center"
-              >
-                <Icon name="trash-2" size={18} color={color.muted} />
-              </Pressable>
-            </Card>
-          ))}
+          {oneoffs.map((rule) => renderRuleCard(rule, false))}
         </View>
       ) : null}
 

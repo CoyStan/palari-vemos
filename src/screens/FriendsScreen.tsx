@@ -43,6 +43,18 @@ export function FriendsScreen() {
     }
   };
 
+  const onAddFriend = () => {
+    Alert.alert(
+      'Add a friend',
+      'We only copy the one contact you pick. Everything stays on your phone.',
+      [
+        { text: 'Add manually', onPress: openAddFriend },
+        { text: 'Choose from contacts', onPress: () => void onPickContact() },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    );
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-canvas font-sans" edges={['top', 'left', 'right']}>
       <View className="flex-1 px-5 pt-4">
@@ -51,12 +63,8 @@ export function FriendsScreen() {
           <Text className="text-caption text-muted">The people worth making time for</Text>
         </View>
 
-        <View className="mb-4 gap-2">
-          <Button label="Add manually" onPress={openAddFriend} />
-          <Button label="Choose from contacts" variant="secondary" onPress={() => void onPickContact()} />
-          <Text className="text-center text-caption text-muted">
-            We only copy the one contact you pick. Everything stays on your phone.
-          </Text>
+        <View className="mb-4">
+          <Button label="Add friend" onPress={onAddFriend} />
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerClassName="gap-3 pb-6">

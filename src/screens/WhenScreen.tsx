@@ -173,12 +173,13 @@ export function WhenScreen() {
           </View>
           <PressableScale
             accessibilityRole="button"
-            accessibilityLabel="Add availability"
+            accessibilityLabel="Add free time"
             onPress={openAddAvailability}
-            className="h-12 w-12 items-center justify-center rounded-full bg-primary"
+            className="min-h-12 flex-row items-center justify-center gap-1.5 rounded-full bg-primary px-4"
             style={shadowSoft}
           >
-            <Icon name="plus" size={24} color="#FFFFFF" />
+            <Icon name="plus" size={20} color="#FFFFFF" />
+            <Text className="font-sans-semibold text-caption text-white">Free time</Text>
           </PressableScale>
         </View>
 
@@ -279,17 +280,27 @@ export function WhenScreen() {
           </View>
         ) : null}
 
-        {data.friends.length === 0 && data.availability.length === 0 && mode === 'list' ? (
+        {data.friends.length === 0 && mode === 'list' ? (
           <Card className="gap-3">
             <Text className="font-sans-bold text-section text-ink">
-              Let’s get you to a real plan
+              Start with someone you miss
             </Text>
             <Text className="text-body text-muted">
-              Add a friend and when you’re usually free. Then tap a time and
-              invite someone — that’s the whole trick.
+              Add a friend first — then mark when you’re free and invite them.
             </Text>
             <Button label="Add a friend" onPress={openAddFriend} />
-            <Button label="Add availability" variant="secondary" onPress={openAddAvailability} />
+          </Card>
+        ) : null}
+
+        {data.friends.length > 0 && data.availability.length === 0 && mode === 'list' ? (
+          <Card className="gap-3">
+            <Text className="font-sans-bold text-section text-ink">
+              Mark when you’re free
+            </Text>
+            <Text className="text-body text-muted">
+              Even an hour helps. Add free time, then tap a slot to plan with someone.
+            </Text>
+            <Button label="Add free time" onPress={openAddAvailability} />
           </Card>
         ) : null}
 
@@ -299,22 +310,22 @@ export function WhenScreen() {
             contentContainerClassName="gap-3 pb-6"
             showsVerticalScrollIndicator={false}
           >
-            {timeline.length === 0 && (data.friends.length > 0 || data.availability.length > 0) ? (
-              <Card>
+            {timeline.length === 0 && data.friends.length > 0 && data.availability.length > 0 ? (
+              <Card className="gap-3">
                 <Text className="text-body text-muted">
-                  Nothing open in the next three weeks yet. Tap + to mark some
-                  free time — even an hour counts.
+                  Nothing open in the next three weeks yet. Add free time — even an hour counts.
                 </Text>
+                <Button label="Add free time" variant="secondary" onPress={openAddAvailability} />
               </Card>
             ) : null}
 
             {timeline.map((item) => {
-              if (item.type === 'due_friend') {
+              if (item.type === 'catch_up') {
                 return (
                   <PressableScale
-                    key={`due-${item.friend.id}`}
+                    key={`catch-${item.friend.id}`}
                     accessibilityRole="button"
-                    accessibilityLabel={`${item.friend.name}, due for a catch-up`}
+                    accessibilityLabel={`${item.friend.name}, catch-up suggestion`}
                     onPress={() => openFriendProfile(item.friend.id)}
                   >
                     <View className="flex-row items-center gap-3 rounded-card bg-coral-soft p-4">
@@ -329,6 +340,23 @@ export function WhenScreen() {
                       </View>
                       <Icon name="chevron-right" size={20} color={color.coralDeep} />
                     </View>
+                  </PressableScale>
+                );
+              }
+
+              if (item.type === 'did_it_happen') {
+                const plan = item.plan;
+                return (
+                  <PressableScale
+                    key={`ask-${plan.id}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Did ${plan.title} happen?`}
+                    onPress={() => openPlanDetail(plan.id)}
+                  >
+                    <Card className="gap-1 p-4">
+                      <Text className="font-sans-semibold text-caption text-muted">Did this happen?</Text>
+                      <Text className="font-sans-bold text-section text-ink">{plan.title}</Text>
+                    </Card>
                   </PressableScale>
                 );
               }
@@ -372,7 +400,7 @@ export function WhenScreen() {
               const yes = plan.friends.filter((f) => f.status === 'yes').length;
               const waiting = plan.friends.filter((f) => f.status === 'waiting' || f.status === 'maybe').length;
               const names = plan.friends
-                .map((f) => data.friends.find((friend) => friend.id === f.friendId)?.name)
+                .map((f) => data.friends.find((friend) => friend.id === f.friendId)?.name ?? f.displayNameSnapshot)
                 .filter(Boolean)
                 .join(', ');
 
@@ -408,7 +436,7 @@ export function WhenScreen() {
           <View className="flex-1 gap-2">
             <Text className="text-caption text-muted">
               {data.availability.length === 0
-                ? 'Tap + to mark free time, then tap a slot to plan.'
+                ? 'Tap Free time to mark when you’re open, then tap a slot to plan.'
                 : 'Tap a free slot to plan · long-press to skip · tap a plan to open'}
             </Text>
             <WhenCalendar

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
+  BackHandler,
   Modal,
   Pressable,
   StyleSheet,
+  Text,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -15,6 +17,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Icon } from './Icon';
 import { color, radius } from '../foundation';
 import { useReduceMotion } from '../ui/useReduceMotion';
 
@@ -25,6 +28,7 @@ type Props = {
   onExited?: () => void;
   children: ReactNode;
   accessibilityLabel?: string;
+  closeLabel?: string;
 };
 
 const OPEN_MS = 250;
@@ -41,6 +45,7 @@ export function AnimatedDialog({
   onExited,
   children,
   accessibilityLabel = 'Dialog',
+  closeLabel = 'Close',
 }: Props) {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
@@ -80,6 +85,19 @@ export function AnimatedDialog({
     );
   }, [progress, reduceMotion, visible]);
 
+  useEffect(() => {
+    if (!mounted) {
+      return undefined;
+    }
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      onClose();
+      return true;
+    });
+
+    return () => subscription.remove();
+  }, [mounted, onClose]);
+
   const backdropStyle = useAnimatedStyle(() => ({
     opacity: progress.value * 0.52,
   }));
@@ -105,12 +123,14 @@ export function AnimatedDialog({
       visible={mounted}
       animationType="none"
       statusBarTranslucent
+      accessibilityViewIsModal
       onRequestClose={onClose}
     >
       <View className="flex-1 justify-end">
         <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Dismiss dialog"
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+          accessibilityElementsHidden
           className="absolute inset-0"
           onPress={onClose}
         >
@@ -140,8 +160,18 @@ export function AnimatedDialog({
             sheetStyle,
           ]}
         >
-          <View className="items-center py-2">
+          <View className="relative items-center px-4 py-2">
             <View className="h-1 w-10 rounded-full bg-border" />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={closeLabel}
+              onPress={onClose}
+              hitSlop={8}
+              className="absolute right-4 min-h-[44px] min-w-[44px] flex-row items-center justify-center gap-1 rounded-full active:bg-primary-soft"
+            >
+              <Icon name="x" size={18} color={color.muted} accessibilityLabel="" />
+              <Text className="font-sans-semibold text-caption text-muted">{closeLabel}</Text>
+            </Pressable>
           </View>
           {children}
         </Animated.View>

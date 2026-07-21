@@ -14,12 +14,22 @@ type Props = TextInputProps & {
   className?: string;
 };
 
-export function TextField({ label, hint, className, style, ...rest }: Props) {
+export function TextField({
+  label,
+  hint,
+  className,
+  style,
+  accessibilityLabel,
+  accessibilityHint,
+  ...rest
+}: Props) {
   return (
     <View className="gap-2">
       <Text className="text-caption font-semibold text-ink">{label}</Text>
       <TextInput
         placeholderTextColor={color.muted}
+        accessibilityLabel={accessibilityLabel ?? label}
+        accessibilityHint={hint ?? accessibilityHint}
         className={cn(
           'min-h-[52px] rounded-control border border-border bg-surface px-4 py-3 text-body text-ink',
           className,

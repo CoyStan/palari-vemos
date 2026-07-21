@@ -13,9 +13,11 @@ import type {
 } from './types';
 import {
   addDays,
+  calendarDaysBetween,
   dateAtMinutes,
   daysSince,
   formatDateKey,
+  MONTH_LABELS_SHORT,
   parseDateKey,
   startOfDay,
 } from './time';
@@ -74,14 +76,19 @@ export function rhythmDays(friend: Friend): number | null {
   return RHYTHM_OPTIONS.find((option) => option.value === friend.rhythm)?.days ?? null;
 }
 
+/** Cadence baseline: lastMetAt, else createdAt — never treat “no catch-up logged” as overdue on day one. */
+export function catchUpBaselineIso(friend: Friend): string {
+  return friend.lastMetAt ?? friend.createdAt;
+}
+
 export function catchUpStatus(friend: Friend, now = new Date()): FriendCatchUpStatus {
   const days = rhythmDays(friend);
   if (days === null) {
     return 'none';
   }
-  const since = daysSince(friend.lastMetAt, now);
+  const since = daysSince(catchUpBaselineIso(friend), now);
   if (since === null) {
-    return 'due';
+    return 'none';
   }
   if (since >= days) {
     return 'due';
@@ -105,27 +112,27 @@ export function catchUpLabel(status: FriendCatchUpStatus, friend?: Friend): stri
   return 'On track';
 }
 
-/** Warm last-met copy — no guilt framing. */
+/** Warm last-met copy — no guilt framing. Never claims you have never met. */
 export function lastMetLabel(lastMetAt: string | null, now = new Date()): string {
   const days = daysSince(lastMetAt, now);
   if (days === null) {
-    return 'Not met yet';
+    return 'No catch-ups logged';
   }
   if (days === 0) {
-    return 'Met today';
+    return 'Caught up today';
   }
   if (days === 1) {
-    return 'Met yesterday';
+    return 'Caught up yesterday';
   }
   if (days < 14) {
-    return `Met ${days} days ago`;
+    return `Caught up ${days} days ago`;
   }
   if (days < 60) {
     const weeks = Math.round(days / 7);
-    return weeks === 1 ? 'Met about a week ago' : `Met about ${weeks} weeks ago`;
+    return weeks === 1 ? 'Caught up about a week ago' : `Caught up about ${weeks} weeks ago`;
   }
   const months = Math.round(days / 30);
-  return months <= 1 ? 'Met about a month ago' : `Met about ${months} months ago`;
+  return months <= 1 ? 'Caught up about a month ago' : `Caught up about ${months} months ago`;
 }
 
 export function sortFriendsForPicker(friends: Friend[], plans: Plan[], now = new Date()): Friend[] {
@@ -180,92 +187,71 @@ export function computePlanStatus(friends: Plan['friends']): PlanStatus {
 export function buildInviteText(input: {
   name: string;
   startAt: string;
+  endAt?: string;
   activity?: string;
   place?: string;
   timeFormat24h: boolean;
   tone?: InviteTone;
 }): string {
   const name = input.name.trim() || 'there';
-  const when = formatPlanWhen(input.startAt, input.timeFormat24h);
+  const when = formatPlanWhen(input.startAt, input.timeFormat24h, input.endAt);
   const activity = input.activity?.trim();
   const place = input.place?.trim();
   const tone = input.tone ?? 'warm';
 
   if (tone === 'casual') {
     if (activity && place) {
-      return `Yo ${name} — ${activity} at ${place} ${when}. In?`;
+      return `Hey ${name} — ${activity} at ${place}, ${when}. In?`;
     }
     if (activity) {
-      return `Yo ${name} — ${activity} ${when}. You down?`;
+      return `Hey ${name} — ${activity} ${when}. You free?`;
     }
-    return `Yo ${name} — I’m free ${when}. Hang?`;
+    return `Hey ${name} — I’m free ${when}. Want to catch up?`;
   }
 
   if (tone === 'playful') {
     if (activity && place) {
-      return `${name}. ${activity} at ${place}. ${when}. This is happening, right?`;
+      return `${name} — ${activity} at ${place}, ${when}. Sounds good?`;
     }
     if (activity) {
-      return `Official business, ${name}: ${activity}, ${when}. Attendance mandatory (please).`;
+      return `${name} — ${activity}, ${when}. Want to?`;
     }
-    return `${name}! A wild free spot appeared: ${when}. You’re the first person I thought of. Coming?`;
+    return `Hey ${name} — I’m free ${when}. You’re the first person I thought of.`;
   }
 
   if (activity && place) {
-    return `Hey ${name}! I’m thinking ${activity} at ${place} ${when}. Are you in?`;
+    return `Hey ${name} — I’m thinking ${activity} at ${place}, ${when}. Are you in?`;
   }
   if (activity) {
-    return `Hey ${name}! I’m thinking ${activity} ${when}. Want to meet?`;
+    return `Hey ${name} — I’m thinking ${activity}, ${when}. Want to meet?`;
   }
-  return `Hey ${name}! So, when? I’m free ${when}. Want to meet?`;
+  return `Hey ${name} — I’m free ${when}. Want to catch up?`;
 }
 
-/**
- * One gentle, self-knowledge-only observation for the top of When.
- * Never guilt, never red — at most one line, or nothing.
- */
-export function buildInsight(friends: Friend[], plans: Plan[], now = new Date()): string | null {
-  if (friends.length === 0) {
-    return null;
-  }
-  const upcoming = plans.filter((plan) => (
-    plan.status !== 'done'
-    && plan.status !== 'cancelled'
-    && new Date(plan.startAt).getTime() >= now.getTime()
-  ));
-
-  const dueAlone = friends
-    .filter((friend) => catchUpStatus(friend, now) === 'due')
-    .filter((friend) => !upcoming.some((plan) => plan.friends.some(
-      (item) => item.friendId === friend.id && item.status !== 'moved',
-    )))
-    .sort((a, b) => (daysSince(b.lastMetAt, now) ?? 9999) - (daysSince(a.lastMetAt, now) ?? 9999))[0];
-
-  if (dueAlone) {
-    return `${dueAlone.name} would probably love to hear from you — ${lastMetLabel(dueAlone.lastMetAt, now).toLowerCase()}.`;
-  }
-
-  const recentWeekend = plans.some((plan) => {
-    const day = new Date(plan.startAt).getDay();
-    const gap = Math.abs(now.getTime() - new Date(plan.startAt).getTime());
-    return (day === 0 || day === 6) && gap < 45 * 24 * 60 * 60 * 1000;
-  });
-  if (!recentWeekend) {
-    return 'You haven’t planned a weekend in a while — a slow Saturday could be lovely.';
-  }
-
-  if (upcoming.length === 0) {
-    return 'Nothing on the horizon — a good week to change that.';
-  }
+/** Alpha: no generic insight claims about life outside So, When?. */
+export function buildInsight(_friends: Friend[], _plans: Plan[], _now = new Date()): string | null {
   return null;
 }
 
-export function formatPlanWhen(iso: string, timeFormat24h: boolean): string {
+export function formatPlanWhen(iso: string, timeFormat24h: boolean, endIso?: string): string {
   const date = new Date(iso);
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const day = days[date.getDay()] ?? '';
-  const minutes = date.getHours() * 60 + date.getMinutes();
-  return `${day} at ${formatClock(minutes, timeFormat24h)}`;
+  const month = MONTH_LABELS_SHORT[date.getMonth()] ?? '';
+  const dayNum = date.getDate();
+  const year = date.getFullYear();
+  const nowYear = new Date().getFullYear();
+  const startMin = date.getHours() * 60 + date.getMinutes();
+  let timePart = formatClock(startMin, timeFormat24h);
+  if (endIso) {
+    const end = new Date(endIso);
+    const endMin = end.getHours() * 60 + end.getMinutes();
+    timePart = `${formatClock(startMin, timeFormat24h)}–${formatClock(endMin, timeFormat24h)}`;
+  }
+  const datePart = year !== nowYear
+    ? `${day}, ${month} ${dayNum}, ${year}`
+    : `${day}, ${month} ${dayNum}`;
+  return `${datePart} from ${timePart}`;
 }
 
 export function formatClock(minutes: number, timeFormat24h: boolean): string {
@@ -280,18 +266,69 @@ export function formatClock(minutes: number, timeFormat24h: boolean): string {
   return m === 0 ? `${hour12} ${suffix}` : `${hour12}:${mm} ${suffix}`;
 }
 
-/** True when an active plan already covers this availability slot. */
-export function slotIsBooked(slot: ConcreteSlot, plans: Plan[]): boolean {
+export function intervalsOverlap(
+  aStart: number,
+  aEnd: number,
+  bStart: number,
+  bEnd: number,
+): boolean {
+  return aStart < bEnd && aEnd > bStart;
+}
+
+export function isActivePlan(plan: Plan): boolean {
+  return plan.status !== 'cancelled' && plan.status !== 'done';
+}
+
+export function proposePlanWindow(
+  windowStartAt: string,
+  windowEndAt: string,
+  defaultDurationMinutes: number,
+): { startAt: string; endAt: string } {
+  const startMs = new Date(windowStartAt).getTime();
+  const windowEndMs = new Date(windowEndAt).getTime();
+  const durationMs = Math.max(30, defaultDurationMinutes) * 60_000;
+  const endMs = Math.min(windowEndMs, startMs + durationMs);
+  return {
+    startAt: new Date(startMs).toISOString(),
+    endAt: new Date(Math.max(startMs + 30 * 60_000, endMs)).toISOString(),
+  };
+}
+
+export function slotConflictsWithPlans(
+  startAt: string,
+  endAt: string,
+  plans: Plan[],
+  options?: {
+    availabilityKey?: string | null;
+    excludePlanId?: string | null;
+  },
+): boolean {
+  const startMs = new Date(startAt).getTime();
+  const endMs = new Date(endAt).getTime();
   return plans.some((plan) => {
-    if (plan.status === 'cancelled' || plan.status === 'done') {
-      return false;
+    if (!isActivePlan(plan)) return false;
+    if (options?.excludePlanId && plan.id === options.excludePlanId) return false;
+    if (options?.availabilityKey && plan.availabilityKey === options.availabilityKey) {
+      return true;
     }
-    const planDate = formatDateKey(new Date(plan.startAt));
-    if (planDate !== slot.date) {
-      return false;
-    }
-    const startMin = new Date(plan.startAt).getHours() * 60 + new Date(plan.startAt).getMinutes();
-    return Math.abs(startMin - slot.startMinutes) < 30;
+    return intervalsOverlap(
+      startMs,
+      endMs,
+      new Date(plan.startAt).getTime(),
+      new Date(plan.endAt).getTime(),
+    );
+  });
+}
+
+/** True when an active plan overlaps this availability window. */
+export function slotIsBooked(
+  slot: ConcreteSlot,
+  plans: Plan[],
+  excludePlanId?: string | null,
+): boolean {
+  return slotConflictsWithPlans(slot.startAt, slot.endAt, plans, {
+    availabilityKey: slot.key,
+    excludePlanId: excludePlanId ?? null,
   });
 }
 
@@ -311,7 +348,7 @@ export function suggestSlotsForScheduling(
   },
 ): ConcreteSlot[] {
   const count = options?.count ?? 3;
-  const duration = Math.max(30, options?.durationMinutes ?? 120);
+  const duration = Math.max(30, options?.durationMinutes ?? 60);
   const from = options?.from ?? startOfDay(new Date());
 
   const carve = (window: ConcreteSlot, startMinutes: number): ConcreteSlot | null => {
@@ -422,9 +459,7 @@ export function expandAvailability(
           matches = true;
         } else if (rule.recurrence === 'biweekly') {
           const startDate = parseDateKey(rule.startDate);
-          const diffDays = Math.floor(
-            (startOfDay(day).getTime() - startOfDay(startDate).getTime()) / 86400000,
-          );
+          const diffDays = calendarDaysBetween(startDate, day);
           matches = Math.floor(diffDays / 7) % 2 === 0;
         }
       }
@@ -457,58 +492,64 @@ export function expandAvailability(
 export type TimelineItem =
   | { type: 'availability'; sortAt: string; slot: ConcreteSlot }
   | { type: 'plan'; sortAt: string; plan: Plan }
-  | { type: 'due_friend'; sortAt: string; friend: Friend };
+  | { type: 'catch_up'; sortAt: string; friend: Friend }
+  | { type: 'did_it_happen'; sortAt: string; plan: Plan };
 
+/**
+ * Home list: future active plans + future unbooked free times.
+ * Optional: one recently ended unresolved plan; at most one catch-up nudge (not chronological).
+ */
 export function buildTimeline(
   friends: Friend[],
   plans: Plan[],
   slots: ConcreteSlot[],
   now = new Date(),
+  options?: { spotlightPlanId?: string | null },
 ): TimelineItem[] {
   const items: TimelineItem[] = [];
-  const bookedKeys = new Set<string>();
+  const nowMs = now.getTime();
+  const spotlightId = options?.spotlightPlanId ?? null;
 
   for (const plan of plans) {
-    if (plan.status === 'cancelled') {
-      continue;
-    }
+    if (!isActivePlan(plan)) continue;
+    if (spotlightId && plan.id === spotlightId) continue;
+    if (new Date(plan.endAt).getTime() < nowMs) continue;
     items.push({ type: 'plan', sortAt: plan.startAt, plan });
-    const planDate = formatDateKey(new Date(plan.startAt));
-    const startMin = new Date(plan.startAt).getHours() * 60 + new Date(plan.startAt).getMinutes();
-    for (const slot of slots) {
-      if (slot.date === planDate && Math.abs(slot.startMinutes - startMin) < 30) {
-        bookedKeys.add(slot.key);
-      }
-    }
   }
 
   for (const slot of slots) {
-    if (bookedKeys.has(slot.key)) {
-      continue;
-    }
-    if (new Date(slot.endAt).getTime() < now.getTime()) {
-      continue;
-    }
+    if (slotIsBooked(slot, plans)) continue;
+    if (new Date(slot.endAt).getTime() < nowMs) continue;
     items.push({ type: 'availability', sortAt: slot.startAt, slot });
   }
 
-  for (const friend of friends) {
-    if (catchUpStatus(friend, now) === 'due') {
-      items.push({
-        type: 'due_friend',
-        sortAt: now.toISOString(),
-        friend,
-      });
-    }
+  items.sort((a, b) => a.sortAt.localeCompare(b.sortAt));
+
+  const unresolved = plans
+    .filter((plan) => (
+      isActivePlan(plan)
+      && new Date(plan.endAt).getTime() < nowMs
+      && new Date(plan.endAt).getTime() > nowMs - 3 * 24 * 60 * 60 * 1000
+      && (plan.status === 'on' || plan.status === 'waiting')
+    ))
+    .sort((a, b) => b.endAt.localeCompare(a.endAt))[0];
+
+  if (unresolved) {
+    items.unshift({ type: 'did_it_happen', sortAt: unresolved.endAt, plan: unresolved });
   }
 
-  return items.sort((a, b) => {
-    if (a.type === 'due_friend' && b.type !== 'due_friend') {
-      return -1;
-    }
-    if (b.type === 'due_friend' && a.type !== 'due_friend') {
-      return 1;
-    }
-    return a.sortAt.localeCompare(b.sortAt);
-  });
+  const upcomingFriendIds = new Set(
+    plans
+      .filter((plan) => isActivePlan(plan) && new Date(plan.startAt).getTime() >= nowMs)
+      .flatMap((plan) => plan.friends.map((item) => item.friendId)),
+  );
+  const nudge = friends
+    .filter((friend) => catchUpStatus(friend, now) === 'due')
+    .filter((friend) => !upcomingFriendIds.has(friend.id))
+    .sort((a, b) => a.name.localeCompare(b.name))[0];
+  if (nudge) {
+    items.push({ type: 'catch_up', sortAt: now.toISOString(), friend: nudge });
+  }
+
+  return items;
 }

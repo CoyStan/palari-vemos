@@ -6,6 +6,7 @@ import { Card } from '../components/Card';
 import { color } from '../foundation';
 import { ensureNotificationPermission } from '../services/reminders';
 import { useApp } from '../state/AppProvider';
+import { cn } from '../ui/cn';
 import type { ReactNode } from 'react';
 
 function hourLabel(hour: number, timeFormat24h: boolean): string {
@@ -24,7 +25,16 @@ const CALENDAR_START_HOURS = [5, 6, 7, 8, 9, 10];
 const CALENDAR_END_HOURS = [18, 19, 20, 21, 22, 23, 24];
 
 export function SettingsScreen() {
-  const { data, updateSettings, exportData, wipeData, openAvailability, openPrivacyPolicy } = useApp();
+  const {
+    data,
+    saveError,
+    updateSettings,
+    exportData,
+    wipeData,
+    retrySave,
+    openAvailability,
+    openPrivacyPolicy,
+  } = useApp();
   const settings = data.settings;
 
   const calendarStartOptions = CALENDAR_START_HOURS.map((hour) => ({
@@ -55,12 +65,36 @@ export function SettingsScreen() {
   };
 
   const onExport = async () => {
-    const json = await exportData();
-    try {
-      await Share.share({ message: json, title: 'So, When? data export' });
-    } catch {
-      Alert.alert('Export ready', 'Could not open the share sheet. Try again.');
-    }
+    Alert.alert(
+      'Export text data',
+      'This shares a JSON file of your So, When? text data. Photos are not included. The file can contain names, phone numbers, notes, and statuses—share carefully.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Export',
+          onPress: () => {
+            void (async () => {
+              const json = await exportData();
+              try {
+                const { writeTempExportJson, deleteTempFile } = await import('../services/media');
+                const uri = await writeTempExportJson(json);
+                if (uri) {
+                  await Share.share({ url: uri, title: 'So, When? data export (photos not included)' });
+                  await deleteTempFile(uri);
+                } else {
+                  await Share.share({
+                    message: json,
+                    title: 'So, When? data export (photos not included)',
+                  });
+                }
+              } catch {
+                Alert.alert('Export ready', 'Could not open the share sheet. Try again.');
+              }
+            })();
+          },
+        },
+      ],
+    );
   };
 
   const onWipe = () => {
@@ -73,7 +107,12 @@ export function SettingsScreen() {
           text: 'Delete everything',
           style: 'destructive',
           onPress: () => {
-            void wipeData();
+            void (async () => {
+              const result = await wipeData();
+              if (!result.ok) {
+                Alert.alert('Could not delete data', result.message ?? 'Something went wrong. Try again.');
+              }
+            })();
           },
         },
       ],
@@ -92,34 +131,24 @@ export function SettingsScreen() {
           <Text className="text-caption text-muted">Quiet defaults. Everything stays local.</Text>
         </View>
 
+        {saveError ? (
+          <Card className="gap-3 border border-danger bg-surface p-4">
+            <Text className="font-sans-semibold text-body text-danger">Couldn’t save changes</Text>
+            <Text className="text-caption text-muted">{saveError}</Text>
+            <Button label="Try again" variant="secondary" onPress={() => void retrySave()} />
+          </Card>
+        ) : null}
+
         <Section title="Availability">
           <Button label="Manage availability" variant="secondary" onPress={openAvailability} />
         </Section>
 
-        <Section title="Reminders">
+        <Section title="Plan reminders">
           <ToggleRow
             label="Local reminders"
             hint="Optional, quiet, and on-device only"
             value={settings.notificationsEnabled}
             onValueChange={(value) => void onEnableNotifications(value)}
-          />
-          <ToggleRow
-            label="Free-time nudge"
-            value={settings.notifyFreeSlots}
-            onValueChange={(value) => toggle('notifyFreeSlots', value)}
-            disabled={!settings.notificationsEnabled}
-          />
-          <ToggleRow
-            label="Catch-up nudge"
-            value={settings.notifyCatchUpDue}
-            onValueChange={(value) => toggle('notifyCatchUpDue', value)}
-            disabled={!settings.notificationsEnabled}
-          />
-          <ToggleRow
-            label="Waiting follow-up"
-            value={settings.notifyWaitingFollowUp}
-            onValueChange={(value) => toggle('notifyWaitingFollowUp', value)}
-            disabled={!settings.notificationsEnabled}
           />
           <ToggleRow
             label="Plan tomorrow"
@@ -135,7 +164,34 @@ export function SettingsScreen() {
           />
         </Section>
 
-        <Section title="Defaults">
+        <Section title="Catch-up reminders">
+          <ToggleRow
+            label="Catch-up nudge"
+            value={settings.notifyCatchUpDue}
+            onValueChange={(value) => toggle('notifyCatchUpDue', value)}
+            disabled={!settings.notificationsEnabled}
+          />
+        </Section>
+
+        <Section title="Privacy & data">
+          <Text className="text-body text-muted">
+            So, When? stores friends, availability, and plans only on this device.
+            Friends do not need the app. Contacts are never scanned or uploaded —
+            you choose one contact at a time when you want to copy a name or number.
+          </Text>
+          <Button label="Privacy policy" variant="secondary" onPress={openPrivacyPolicy} />
+          <Button label="Export data" variant="secondary" onPress={() => void onExport()} />
+          <Button label="Delete all data" variant="ghost" onPress={onWipe} />
+        </Section>
+
+        <Section title="About">
+          <Text className="text-body text-muted">
+            So, When? is made by Palari Labs, Inc. Version 1 is a private organizer —
+            not a social network.
+          </Text>
+        </Section>
+
+        <Section title="Advanced">
           <ChoiceChips
             label="Default plan duration"
             options={[
@@ -146,15 +202,6 @@ export function SettingsScreen() {
             ]}
             value={settings.defaultDurationMinutes}
             onChange={(value) => void updateSettings({ defaultDurationMinutes: value })}
-          />
-          <ChoiceChips
-            label="First day of week"
-            options={[
-              { value: 0, label: 'Sunday' },
-              { value: 1, label: 'Monday' },
-            ]}
-            value={settings.firstDayOfWeek}
-            onChange={(value) => void updateSettings({ firstDayOfWeek: value })}
           />
           <ToggleRow
             label="24-hour time"
@@ -182,24 +229,13 @@ export function SettingsScreen() {
               void updateSettings({ calendarDayEndHour: end });
             }}
           />
-        </Section>
-
-        <Section title="Privacy">
-          <Text className="text-body text-muted">
-            So, When? stores friends, availability, and plans only on this device.
-            Friends do not need the app. Contacts are never scanned or uploaded —
-            you choose one contact at a time when you want to copy a name or number.
-          </Text>
-          <Button label="Privacy policy" variant="secondary" onPress={openPrivacyPolicy} />
-          <Button label="Export data" variant="secondary" onPress={() => void onExport()} />
-          <Button label="Delete all data" variant="ghost" onPress={onWipe} />
-        </Section>
-
-        <Section title="About">
-          <Text className="text-body text-muted">
-            So, When? is made by Palari Labs, Inc. Version 1 is a private organizer —
-            not a social network.
-          </Text>
+          <ToggleRow
+            label="Show names on reminders"
+            hint="When off, lock-screen reminders stay generic"
+            value={settings.showReminderNames}
+            onValueChange={(value) => toggle('showReminderNames', value)}
+            disabled={!settings.notificationsEnabled}
+          />
         </Section>
       </ScrollView>
     </SafeAreaView>
@@ -229,7 +265,7 @@ function ToggleRow({
   disabled?: boolean;
 }) {
   return (
-    <View className="min-h-[52px] flex-row items-center justify-between gap-3 py-1 opacity-100">
+    <View className={cn('min-h-[52px] flex-row items-center justify-between gap-3 py-1', disabled ? 'opacity-50' : 'opacity-100')}>
       <View className="flex-1">
         <Text className="text-body text-ink">{label}</Text>
         {hint ? <Text className="text-caption text-muted">{hint}</Text> : null}
