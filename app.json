@@ -1,15 +1,19 @@
 {
   "expo": {
-    "name": "Vemos",
+    "name": "So, When?",
     "slug": "vemos",
     "version": "0.1.0",
-    "scheme": "vemos",
+    "scheme": "sowhen",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.palarilabs.vemos"
+      "bundleIdentifier": "com.palarilabs.vemos",
+      "infoPlist": {
+        "NSContactsUsageDescription": "So, When? only copies the single contact you choose. Your address book is never scanned or uploaded.",
+        "NSPhotoLibraryUsageDescription": "Add an optional photo for a friend you want to see."
+      }
     },
     "android": {
       "package": "com.palarilabs.vemos",
@@ -22,11 +26,28 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
     },
     "extra": {
-      "product": "vemos",
+      "product": "so-when",
       "organization": "Palari Labs"
-    }
+    },
+    "plugins": [
+      "expo-font",
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "So, When? only copies the single contact you choose. Your address book is never scanned or uploaded."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Add an optional photo for a friend you want to see."
+        }
+      ],
+      "expo-notifications"
+    ]
   }
 }

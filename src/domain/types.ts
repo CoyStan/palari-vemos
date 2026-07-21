@@ -1,96 +1,155 @@
-export type ContactMethod =
-  | 'message'
-  | 'call'
+export type ShareMethod =
   | 'whatsapp'
-  | 'email'
+  | 'sms'
+  | 'telegram'
+  | 'message'
   | 'other';
 
-export type InvitationStatus =
-  | 'to_send'
-  | 'sent'
-  | 'accepted'
-  | 'canceled'
+export type CatchUpRhythm =
+  | 'weekly'
+  | 'monthly'
+  | 'quarterly'
+  | 'custom'
+  | 'none';
+
+export type FriendCatchUpStatus = 'due' | 'soon' | 'none';
+
+export type InviteStatus =
+  | 'not_invited'
+  | 'waiting'
+  | 'yes'
+  | 'maybe'
+  | 'no'
+  | 'new_time'
   | 'moved';
+
+export type PlanStatus =
+  | 'draft'
+  | 'waiting'
+  | 'on'
+  | 'needs_time'
+  | 'done'
+  | 'cancelled';
+
+export type AvailabilityKind = 'recurring' | 'oneoff';
+
+export type Recurrence =
+  | 'weekly'
+  | 'biweekly'
+  | 'daily';
 
 export type Friend = {
   id: string;
   name: string;
-  note: string;
-  contactMethod: ContactMethod;
-  /** 1–5; higher means invite more often when picking who to meet. */
-  priority: number;
+  photoUri: string | null;
+  phone: string;
+  shareMethod: ShareMethod;
+  rhythm: CatchUpRhythm;
+  /** Days for custom rhythm; ignored unless rhythm === 'custom'. */
+  customDays: number;
   lastMetAt: string | null;
   createdAt: string;
 };
 
-export type RecurringFreeBlock = {
+export type AvailabilityRule = {
   id: string;
-  kind: 'recurring';
-  /** 0 = Sunday … 6 = Saturday */
-  dayOfWeek: number;
+  kind: AvailabilityKind;
+  label: string;
+  /** 0=Sun … 6=Sat; empty for one-off */
+  daysOfWeek: number[];
   startMinutes: number;
   endMinutes: number;
-  label: string;
+  recurrence: Recurrence;
+  /** YYYY-MM-DD */
+  startDate: string;
+  /** YYYY-MM-DD or null = until turned off */
+  endDate: string | null;
+  /** For one-off only */
+  oneOffDate: string | null;
+  enabled: boolean;
+  createdAt: string;
 };
 
-export type OneOffFreeBlock = {
-  id: string;
-  kind: 'oneoff';
-  /** YYYY-MM-DD in local calendar terms */
+/** Skipped occurrence of a recurring rule (does not delete the rule). */
+export type SkippedOccurrence = {
+  ruleId: string;
+  /** YYYY-MM-DD */
   date: string;
-  startMinutes: number;
-  endMinutes: number;
-  label: string;
 };
 
-export type FreeBlock = RecurringFreeBlock | OneOffFreeBlock;
-
-export type Invitation = {
-  id: string;
+export type PlanFriend = {
   friendId: string;
+  status: InviteStatus;
+  invitationText: string;
+};
+
+export type Plan = {
+  id: string;
+  title: string;
+  activity: string;
+  place: string;
+  note: string;
   startAt: string;
   endAt: string;
-  idea: string;
-  place: string;
-  invitationText: string;
-  status: InvitationStatus;
-  movedFromId: string | null;
+  availabilityKey: string | null;
+  friends: PlanFriend[];
+  status: PlanStatus;
+  /** After-the-moment capture, filled once the plan is done. */
+  memoryNote: string;
+  memoryPhotoUri: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type InviteTone = 'warm' | 'casual' | 'playful';
+
+export type AppSettings = {
+  notificationsEnabled: boolean;
+  notifyFreeSlots: boolean;
+  notifyCatchUpDue: boolean;
+  notifyWaitingFollowUp: boolean;
+  notifyPlanTomorrow: boolean;
+  notifyAskIfHappened: boolean;
+  defaultDurationMinutes: number;
+  /** 0=Sun … 6=Sat */
+  firstDayOfWeek: number;
+  timeFormat24h: boolean;
+  /** First hour shown in week/day calendar (0–23). Display only. */
+  calendarDayStartHour: number;
+  /** Exclusive end hour for week/day calendar (1–24). Display only. */
+  calendarDayEndHour: number;
 };
 
 export type AppData = {
   onboardingComplete: boolean;
   friends: Friend[];
-  freeBlocks: FreeBlock[];
-  invitations: Invitation[];
+  availability: AvailabilityRule[];
+  skipped: SkippedOccurrence[];
+  plans: Plan[];
+  settings: AppSettings;
 };
 
-export type ContactOption = {
-  value: ContactMethod;
-  label: string;
-};
-
-export type PriorityOption = {
-  value: number;
-  label: string;
-  hint: string;
-};
-
-/** A concrete free window on a specific day, expanded from recurring/one-off. */
 export type ConcreteSlot = {
   key: string;
+  ruleId: string | null;
   date: string;
-  dayOfWeek: number;
   startMinutes: number;
   endMinutes: number;
   startAt: string;
   endAt: string;
-  sourceBlockId: string;
   label: string;
 };
 
-export type PlanIdea = {
-  idea: string;
-  place: string;
-};
+export const defaultSettings = (): AppSettings => ({
+  notificationsEnabled: false,
+  notifyFreeSlots: true,
+  notifyCatchUpDue: true,
+  notifyWaitingFollowUp: true,
+  notifyPlanTomorrow: true,
+  notifyAskIfHappened: true,
+  defaultDurationMinutes: 120,
+  firstDayOfWeek: 1,
+  timeFormat24h: false,
+  calendarDayStartHour: 7,
+  calendarDayEndHour: 22,
+});

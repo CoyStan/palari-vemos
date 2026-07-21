@@ -1,55 +1,35 @@
 import {
-  StyleSheet,
   Text,
   TextInput,
   View,
   type TextInputProps,
 } from 'react-native';
 
-import { color, radius, space, type } from '../foundation';
+import { color } from '../foundation';
+import { cn } from '../ui/cn';
 
 type Props = TextInputProps & {
   label: string;
   hint?: string;
+  className?: string;
 };
 
-export function TextField({ label, hint, style, ...rest }: Props) {
+export function TextField({ label, hint, className, style, ...rest }: Props) {
   return (
-    <View style={styles.wrap}>
-      <Text style={styles.label}>{label}</Text>
+    <View className="gap-2">
+      <Text className="text-caption font-semibold text-ink">{label}</Text>
       <TextInput
         placeholderTextColor={color.muted}
-        style={[styles.input, style]}
+        className={cn(
+          'min-h-[52px] rounded-control border border-border bg-surface px-4 py-3 text-body text-ink',
+          className,
+        )}
+        style={style}
         {...rest}
       />
-      {hint ? <Text style={styles.hint}>{hint}</Text> : null}
+      {hint ? (
+        <Text className="text-caption leading-[18px] text-muted">{hint}</Text>
+      ) : null}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  wrap: {
-    gap: space.sm,
-  },
-  label: {
-    color: color.ink,
-    fontSize: type.caption,
-    fontWeight: '600',
-  },
-  input: {
-    minHeight: 52,
-    borderWidth: 1,
-    borderColor: color.border,
-    borderRadius: radius.control,
-    backgroundColor: color.surface,
-    color: color.ink,
-    fontSize: type.body,
-    paddingHorizontal: space.lg,
-    paddingVertical: space.md,
-  },
-  hint: {
-    color: color.muted,
-    fontSize: type.caption,
-    lineHeight: 18,
-  },
-});

@@ -2,125 +2,121 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type {
   AppData,
-  FreeBlock,
+  AppSettings,
+  AvailabilityRule,
   Friend,
-  Invitation,
-  OneOffFreeBlock,
-  RecurringFreeBlock,
+  Plan,
+  SkippedOccurrence,
 } from '../domain/types';
+import { defaultSettings } from '../domain/types';
 
-const STORAGE_KEY = 'vemos.v2';
+const STORAGE_KEY = 'sowhen.v1';
 
 export const emptyAppData = (): AppData => ({
   onboardingComplete: false,
   friends: [],
-  freeBlocks: [],
-  invitations: [],
+  availability: [],
+  skipped: [],
+  plans: [],
+  settings: defaultSettings(),
 });
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function parseFriend(value: unknown): Friend | null {
+function parseSettings(value: unknown): AppSettings {
+  const base = defaultSettings();
   if (!isRecord(value)) {
+    return base;
+  }
+  return {
+    ...base,
+    ...Object.fromEntries(
+      Object.keys(base).map((key) => {
+        const typedKey = key as keyof AppSettings;
+        return [typedKey, value[typedKey] ?? base[typedKey]];
+      }),
+    ),
+  } as AppSettings;
+}
+
+function parseFriend(value: unknown): Friend | null {
+  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.name !== 'string') {
     return null;
   }
-  if (
-    typeof value.id !== 'string'
-    || typeof value.name !== 'string'
-    || typeof value.contactMethod !== 'string'
-    || typeof value.createdAt !== 'string'
-  ) {
-    return null;
-  }
-
-  const priority = typeof value.priority === 'number'
-    ? Math.min(5, Math.max(1, Math.round(value.priority)))
-    : 3;
-
   return {
     id: value.id,
     name: value.name,
-    note: typeof value.note === 'string' ? value.note : '',
-    contactMethod: value.contactMethod as Friend['contactMethod'],
-    priority,
+    photoUri: typeof value.photoUri === 'string' ? value.photoUri : null,
+    phone: typeof value.phone === 'string' ? value.phone : '',
+    shareMethod: (typeof value.shareMethod === 'string' ? value.shareMethod : 'whatsapp') as Friend['shareMethod'],
+    rhythm: (typeof value.rhythm === 'string' ? value.rhythm : 'monthly') as Friend['rhythm'],
+    customDays: typeof value.customDays === 'number' ? value.customDays : 45,
     lastMetAt: typeof value.lastMetAt === 'string' || value.lastMetAt === null
       ? (value.lastMetAt as string | null)
       : null,
-    createdAt: value.createdAt,
+    createdAt: typeof value.createdAt === 'string' ? value.createdAt : new Date().toISOString(),
   };
 }
 
-function parseFreeBlock(value: unknown): FreeBlock | null {
-  if (!isRecord(value)) {
+function parseAvailability(value: unknown): AvailabilityRule | null {
+  if (!isRecord(value) || typeof value.id !== 'string') {
     return null;
   }
-  if (
-    typeof value.id !== 'string'
-    || typeof value.startMinutes !== 'number'
-    || typeof value.endMinutes !== 'number'
-  ) {
-    return null;
-  }
-
-  const label = typeof value.label === 'string' ? value.label : '';
-
-  if (value.kind === 'recurring' && typeof value.dayOfWeek === 'number') {
-    const block: RecurringFreeBlock = {
-      id: value.id,
-      kind: 'recurring',
-      dayOfWeek: value.dayOfWeek,
-      startMinutes: value.startMinutes,
-      endMinutes: value.endMinutes,
-      label,
-    };
-    return block;
-  }
-
-  if (value.kind === 'oneoff' && typeof value.date === 'string') {
-    const block: OneOffFreeBlock = {
-      id: value.id,
-      kind: 'oneoff',
-      date: value.date,
-      startMinutes: value.startMinutes,
-      endMinutes: value.endMinutes,
-      label,
-    };
-    return block;
-  }
-
-  return null;
+  return {
+    id: value.id,
+    kind: value.kind === 'oneoff' ? 'oneoff' : 'recurring',
+    label: typeof value.label === 'string' ? value.label : '',
+    daysOfWeek: Array.isArray(value.daysOfWeek)
+      ? value.daysOfWeek.filter((day): day is number => typeof day === 'number')
+      : [],
+    startMinutes: typeof value.startMinutes === 'number' ? value.startMinutes : 18 * 60,
+    endMinutes: typeof value.endMinutes === 'number' ? value.endMinutes : 20 * 60,
+    recurrence: value.recurrence === 'biweekly' || value.recurrence === 'daily'
+      ? value.recurrence
+      : 'weekly',
+    startDate: typeof value.startDate === 'string' ? value.startDate : formatFallbackDate(),
+    endDate: typeof value.endDate === 'string' ? value.endDate : null,
+    oneOffDate: typeof value.oneOffDate === 'string' ? value.oneOffDate : null,
+    enabled: value.enabled !== false,
+    createdAt: typeof value.createdAt === 'string' ? value.createdAt : new Date().toISOString(),
+  };
 }
 
-function parseInvitation(value: unknown): Invitation | null {
-  if (!isRecord(value)) {
+function formatFallbackDate(): string {
+  const now = new Date();
+  const p = (n: number) => n.toString().padStart(2, '0');
+  return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
+}
+
+function parsePlan(value: unknown): Plan | null {
+  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.startAt !== 'string') {
     return null;
   }
-  if (
-    typeof value.id !== 'string'
-    || typeof value.friendId !== 'string'
-    || typeof value.startAt !== 'string'
-    || typeof value.endAt !== 'string'
-    || typeof value.invitationText !== 'string'
-    || typeof value.status !== 'string'
-    || typeof value.createdAt !== 'string'
-  ) {
-    return null;
-  }
+  const friends = Array.isArray(value.friends)
+    ? value.friends.filter(isRecord).map((item) => ({
+      friendId: typeof item.friendId === 'string' ? item.friendId : '',
+      status: (typeof item.status === 'string' ? item.status : 'not_invited') as Plan['friends'][number]['status'],
+      invitationText: typeof item.invitationText === 'string' ? item.invitationText : '',
+    })).filter((item) => item.friendId)
+    : [];
 
   return {
     id: value.id,
-    friendId: value.friendId,
-    startAt: value.startAt,
-    endAt: value.endAt,
-    idea: typeof value.idea === 'string' ? value.idea : 'catch up',
+    title: typeof value.title === 'string' ? value.title : 'Catch up',
+    activity: typeof value.activity === 'string' ? value.activity : '',
     place: typeof value.place === 'string' ? value.place : '',
-    invitationText: value.invitationText,
-    status: value.status as Invitation['status'],
-    movedFromId: typeof value.movedFromId === 'string' ? value.movedFromId : null,
-    createdAt: value.createdAt,
-    updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : value.createdAt,
+    note: typeof value.note === 'string' ? value.note : '',
+    startAt: value.startAt,
+    endAt: typeof value.endAt === 'string' ? value.endAt : value.startAt,
+    availabilityKey: typeof value.availabilityKey === 'string' ? value.availabilityKey : null,
+    friends,
+    status: (typeof value.status === 'string' ? value.status : 'draft') as Plan['status'],
+    memoryNote: typeof value.memoryNote === 'string' ? value.memoryNote : '',
+    memoryPhotoUri: typeof value.memoryPhotoUri === 'string' ? value.memoryPhotoUri : null,
+    createdAt: typeof value.createdAt === 'string' ? value.createdAt : new Date().toISOString(),
+    updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : new Date().toISOString(),
   };
 }
 
@@ -128,28 +124,34 @@ export function parseAppData(raw: string | null): AppData {
   if (!raw) {
     return emptyAppData();
   }
-
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!isRecord(parsed)) {
       return emptyAppData();
     }
-
     const friends = Array.isArray(parsed.friends)
-      ? parsed.friends.map(parseFriend).filter((friend): friend is Friend => friend !== null)
+      ? parsed.friends.map(parseFriend).filter((item): item is Friend => item !== null)
       : [];
-    const freeBlocks = Array.isArray(parsed.freeBlocks)
-      ? parsed.freeBlocks.map(parseFreeBlock).filter((block): block is FreeBlock => block !== null)
+    const availability = Array.isArray(parsed.availability)
+      ? parsed.availability.map(parseAvailability).filter((item): item is AvailabilityRule => item !== null)
       : [];
-    const invitations = Array.isArray(parsed.invitations)
-      ? parsed.invitations.map(parseInvitation).filter((invite): invite is Invitation => invite !== null)
+    const skipped = Array.isArray(parsed.skipped)
+      ? parsed.skipped.filter(isRecord).map((item) => ({
+        ruleId: String(item.ruleId ?? ''),
+        date: String(item.date ?? ''),
+      })).filter((item): item is SkippedOccurrence => Boolean(item.ruleId && item.date))
+      : [];
+    const plans = Array.isArray(parsed.plans)
+      ? parsed.plans.map(parsePlan).filter((item): item is Plan => item !== null)
       : [];
 
     return {
       onboardingComplete: Boolean(parsed.onboardingComplete) || friends.length > 0,
       friends,
-      freeBlocks,
-      invitations,
+      availability,
+      skipped,
+      plans,
+      settings: parseSettings(parsed.settings),
     };
   } catch {
     return emptyAppData();
@@ -163,6 +165,14 @@ export async function loadAppData(): Promise<AppData> {
 
 export async function saveAppData(data: AppData): Promise<void> {
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+export async function exportAppDataJson(data: AppData): Promise<string> {
+  return JSON.stringify(data, null, 2);
+}
+
+export async function clearAppData(): Promise<void> {
+  await AsyncStorage.removeItem(STORAGE_KEY);
 }
 
 export function createId(prefix: string): string {

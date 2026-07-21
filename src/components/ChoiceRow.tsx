@@ -1,6 +1,6 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
-import { color, radius, space, type } from '../foundation';
+import { cn } from '../ui/cn';
 
 type Option<T extends string | number> = {
   value: T;
@@ -22,9 +22,9 @@ export function ChoiceRow<T extends string | number>({
   onChange,
 }: Props<T>) {
   return (
-    <View style={styles.wrap}>
-      <Text style={styles.label}>{label}</Text>
-      <View style={styles.list}>
+    <View className="gap-2">
+      <Text className="text-caption font-semibold text-ink">{label}</Text>
+      <View className="gap-2">
         {options.map((option) => {
           const selected = option.value === value;
           return (
@@ -34,17 +34,26 @@ export function ChoiceRow<T extends string | number>({
               accessibilityState={{ selected }}
               accessibilityLabel={option.label}
               onPress={() => onChange(option.value)}
-              style={({ pressed }) => [
-                styles.option,
-                selected ? styles.optionSelected : null,
-                pressed ? styles.optionPressed : null,
-              ]}
+              className={cn(
+                'min-h-[52px] justify-center rounded-control border bg-surface px-4 py-3 active:opacity-85',
+                selected ? 'border-primary bg-primary-soft' : 'border-border',
+              )}
             >
-              <Text style={[styles.optionLabel, selected ? styles.optionLabelSelected : null]}>
+              <Text
+                className={cn(
+                  'text-body font-semibold',
+                  selected ? 'text-primary' : 'text-ink',
+                )}
+              >
                 {option.label}
               </Text>
               {option.hint ? (
-                <Text style={[styles.hint, selected ? styles.hintSelected : null]}>
+                <Text
+                  className={cn(
+                    'mt-0.5 text-caption',
+                    selected ? 'text-primary' : 'text-muted',
+                  )}
+                >
                   {option.hint}
                 </Text>
               ) : null}
@@ -55,50 +64,3 @@ export function ChoiceRow<T extends string | number>({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  wrap: {
-    gap: space.sm,
-  },
-  label: {
-    color: color.ink,
-    fontSize: type.caption,
-    fontWeight: '600',
-  },
-  list: {
-    gap: space.sm,
-  },
-  option: {
-    minHeight: 52,
-    borderRadius: radius.control,
-    borderWidth: 1,
-    borderColor: color.border,
-    backgroundColor: color.surface,
-    paddingHorizontal: space.lg,
-    paddingVertical: space.md,
-    justifyContent: 'center',
-  },
-  optionSelected: {
-    borderColor: color.primary,
-    backgroundColor: color.softTeal,
-  },
-  optionPressed: {
-    opacity: 0.85,
-  },
-  optionLabel: {
-    color: color.ink,
-    fontSize: type.body,
-    fontWeight: '600',
-  },
-  optionLabelSelected: {
-    color: color.primary,
-  },
-  hint: {
-    marginTop: 2,
-    color: color.muted,
-    fontSize: type.caption,
-  },
-  hintSelected: {
-    color: color.primary,
-  },
-});

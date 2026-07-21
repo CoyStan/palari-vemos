@@ -1,13 +1,18 @@
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, Text, View } from 'react-native';
+// Pressable used for optional photo control
+import * as ImagePicker from 'expo-image-picker';
 
+import { Avatar } from '../components/Avatar';
 import { Button } from '../components/Button';
+import { Card } from '../components/Card';
 import { ChoiceRow } from '../components/ChoiceRow';
 import { Screen } from '../components/Screen';
+import { ScreenHeader } from '../components/ScreenHeader';
 import { TextField } from '../components/TextField';
-import { CONTACT_OPTIONS, PRIORITY_OPTIONS } from '../domain/time';
-import type { ContactMethod } from '../domain/types';
-import { color, space, type } from '../foundation';
+import { RHYTHM_OPTIONS, SHARE_OPTIONS } from '../domain/model';
+import type { CatchUpRhythm, ShareMethod } from '../domain/types';
+import { pickOneContact } from '../services/contacts';
 import { useApp } from '../state/AppProvider';
 
 type Props = {
@@ -16,33 +21,61 @@ type Props = {
 
 export function FriendFormScreen({ mode }: Props) {
   const {
-    data,
-    editingFriendId,
+    activeFriend,
     saveFriend,
     deleteFriend,
-    goFriends,
-    goCalendar,
+    goBack,
+    data,
   } = useApp();
 
-  const existing = useMemo(
-    () => (mode === 'edit'
-      ? data.friends.find((friend) => friend.id === editingFriendId) ?? null
-      : null),
-    [data.friends, editingFriendId, mode],
-  );
+  const existing = mode === 'edit' ? activeFriend : null;
 
   const [name, setName] = useState(existing?.name ?? '');
-  const [note, setNote] = useState(existing?.note ?? '');
-  const [contactMethod, setContactMethod] = useState<ContactMethod>(
-    existing?.contactMethod ?? 'message',
-  );
-  const [priority, setPriority] = useState(existing?.priority ?? 3);
+  const [photoUri, setPhotoUri] = useState<string | null>(existing?.photoUri ?? null);
+  const [phone, setPhone] = useState(existing?.phone ?? '');
+  const [shareMethod, setShareMethod] = useState<ShareMethod>(existing?.shareMethod ?? 'whatsapp');
+  const [rhythm, setRhythm] = useState<CatchUpRhythm>(existing?.rhythm ?? 'monthly');
+  const [customDays, setCustomDays] = useState(String(existing?.customDays ?? 45));
   const [saving, setSaving] = useState(false);
+  const [picking, setPicking] = useState(false);
 
-  const title = mode === 'edit' ? 'Edit friend' : 'Add a friend';
-  const subtitle = mode === 'edit'
-    ? 'Priority steers who shows up first when you tap a free slot.'
-    : 'A name and a priority are enough. Higher priority means invite more often.';
+  const rhythmOptions = useMemo(
+    () => RHYTHM_OPTIONS.map((option) => ({ value: option.value, label: option.label })),
+    [],
+  );
+
+  const onPickContact = async () => {
+    if (Platform.OS === 'web') {
+      Alert.alert('Contacts', 'Contact picking works on Android and iOS.');
+      return;
+    }
+    setPicking(true);
+    try {
+      const picked = await pickOneContact();
+      if (!picked) {
+        return;
+      }
+      setName(picked.name);
+      setPhone(picked.phone);
+      setPhotoUri(picked.photoUri);
+    } catch {
+      Alert.alert('Could not open contacts', 'You can still add a friend by typing a name.');
+    } finally {
+      setPicking(false);
+    }
+  };
+
+  const onPickPhoto = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets[0]?.uri) {
+      setPhotoUri(result.assets[0].uri);
+    }
+  };
 
   const onSave = async () => {
     if (!name.trim()) {
@@ -54,9 +87,11 @@ export function FriendFormScreen({ mode }: Props) {
       await saveFriend(
         {
           name,
-          note,
-          contactMethod,
-          priority,
+          photoUri,
+          phone,
+          shareMethod,
+          rhythm,
+          customDays: Number.parseInt(customDays, 10) || 45,
           lastMetAt: existing?.lastMetAt ?? null,
         },
         existing?.id,
@@ -72,7 +107,7 @@ export function FriendFormScreen({ mode }: Props) {
     }
     Alert.alert(
       `Remove ${existing.name}?`,
-      'This only removes them from Vemos on this phone.',
+      'This only removes them from So, When? on this phone.',
       [
         { text: 'Keep', style: 'cancel' },
         {
@@ -86,105 +121,91 @@ export function FriendFormScreen({ mode }: Props) {
     );
   };
 
-  const onBack = () => {
-    if (mode === 'edit' || data.friends.length > 0) {
-      goFriends();
-    } else {
-      goCalendar();
-    }
-  };
-
   return (
-    <Screen>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Go back"
-        onPress={onBack}
-        style={styles.back}
-      >
-        <Text style={styles.backText}>← Back</Text>
-      </Pressable>
+    <Screen contentClassName="gap-5">
+      <ScreenHeader
+        title={mode === 'edit' ? 'Edit friend' : 'Add a friend'}
+        onBack={goBack}
+      />
 
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.subtitle}>{subtitle}</Text>
+      {mode === 'create' ? (
+        <Card className="gap-3">
+          <Text className="font-sans-bold text-section text-ink">Two easy ways to add</Text>
+          <Button
+            label="Choose from contacts"
+            variant="secondary"
+            loading={picking}
+            onPress={() => void onPickContact()}
+          />
+          <Text className="text-caption text-muted">
+            We only copy the one contact you pick. Your contacts stay on your phone.
+          </Text>
+          <Text className="text-center text-caption font-sans-semibold text-muted">or just type a name below</Text>
+        </Card>
+      ) : null}
 
-      <View style={styles.form}>
-        <TextField
-          label="Name"
-          value={name}
-          onChangeText={setName}
-          placeholder="Ana"
-          autoCapitalize="words"
-          autoCorrect={false}
-        />
-        <TextField
-          label="Note (optional)"
-          value={note}
-          onChangeText={setNote}
-          placeholder="Loves morning walks"
-        />
-        <ChoiceRow
-          label="How do you usually reach them?"
-          options={CONTACT_OPTIONS}
-          value={contactMethod}
-          onChange={setContactMethod}
-        />
-        <ChoiceRow
-          label="Priority to meet"
-          options={PRIORITY_OPTIONS.map((option) => ({
-            value: option.value,
-            label: option.label,
-            hint: option.hint,
-          }))}
-          value={priority}
-          onChange={setPriority}
-        />
+      <View className="items-center gap-3">
+        <Avatar name={name || 'Friend'} photoUri={photoUri} size={72} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Add photo"
+          onPress={() => void onPickPhoto()}
+        >
+          <Text className="text-body font-sans-semibold text-primary">
+            {photoUri ? 'Change photo' : 'Add photo (optional)'}
+          </Text>
+        </Pressable>
       </View>
 
-      <View style={styles.actions}>
-        <Button
-          label={mode === 'edit' ? 'Save changes' : 'Save friend'}
-          loading={saving}
-          onPress={() => void onSave()}
+      <TextField
+        label="Name"
+        value={name}
+        onChangeText={setName}
+        placeholder="Ana"
+        autoCapitalize="words"
+        autoCorrect={false}
+      />
+
+      <TextField
+        label="Phone (optional)"
+        value={phone}
+        onChangeText={setPhone}
+        placeholder="+1…"
+        keyboardType="phone-pad"
+      />
+
+      <ChoiceRow
+        label="Preferred sharing"
+        options={SHARE_OPTIONS}
+        value={shareMethod}
+        onChange={setShareMethod}
+      />
+
+      <ChoiceRow
+        label="Catch-up rhythm"
+        options={rhythmOptions}
+        value={rhythm}
+        onChange={setRhythm}
+      />
+
+      {rhythm === 'custom' ? (
+        <TextField
+          label="Every how many days?"
+          value={customDays}
+          onChangeText={setCustomDays}
+          keyboardType="number-pad"
         />
-        {mode === 'edit' ? (
-          <Button label="Remove friend" variant="ghost" onPress={onDelete} />
-        ) : null}
-      </View>
+      ) : null}
+
+      <Button
+        label={mode === 'edit' ? 'Save' : 'Add friend'}
+        loading={saving}
+        onPress={() => void onSave()}
+      />
+
+      {mode === 'edit' && existing ? (
+        <Button label="Remove friend" variant="ghost" onPress={onDelete} />
+      ) : null}
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  back: {
-    alignSelf: 'flex-start',
-    minHeight: 44,
-    justifyContent: 'center',
-    marginBottom: space.sm,
-  },
-  backText: {
-    color: color.primary,
-    fontSize: type.body,
-    fontWeight: '600',
-  },
-  title: {
-    color: color.ink,
-    fontSize: type.title,
-    fontWeight: '700',
-    letterSpacing: -0.6,
-    marginBottom: space.sm,
-  },
-  subtitle: {
-    color: color.muted,
-    fontSize: type.body,
-    lineHeight: 24,
-    marginBottom: space.xl,
-  },
-  form: {
-    gap: space.xl,
-    marginBottom: space.xxl,
-  },
-  actions: {
-    gap: space.md,
-  },
-});

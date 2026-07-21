@@ -3,39 +3,46 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  StyleSheet,
   View,
-  type StyleProp,
-  type ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { color, space } from '../foundation';
+import { cn } from '../ui/cn';
 
 type Props = {
   children: ReactNode;
   scroll?: boolean;
-  style?: StyleProp<ViewStyle>;
-  contentStyle?: StyleProp<ViewStyle>;
+  className?: string;
+  contentClassName?: string;
 };
 
-export function Screen({ children, scroll = true, style, contentStyle }: Props) {
+export function Screen({
+  children,
+  scroll = true,
+  className,
+  contentClassName,
+}: Props) {
   const body = scroll ? (
     <ScrollView
-      contentContainerStyle={[styles.content, contentStyle]}
+      contentContainerClassName={cn('px-6 pb-10 pt-6', contentClassName)}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
       {children}
     </ScrollView>
   ) : (
-    <View style={[styles.content, styles.fill, contentStyle]}>{children}</View>
+    <View className={cn('flex-1 px-6 pb-10 pt-6', contentClassName)}>
+      {children}
+    </View>
   );
 
   return (
-    <SafeAreaView style={[styles.safe, style]} edges={['top', 'left', 'right']}>
+    <SafeAreaView
+      className={cn('flex-1 bg-canvas font-sans', className)}
+      edges={['top', 'left', 'right']}
+    >
       <KeyboardAvoidingView
-        style={styles.fill}
+        className="flex-1"
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         {body}
@@ -43,18 +50,3 @@ export function Screen({ children, scroll = true, style, contentStyle }: Props) 
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: color.canvas,
-  },
-  fill: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: space.xl,
-    paddingTop: space.lg,
-    paddingBottom: space.xxl,
-  },
-});
