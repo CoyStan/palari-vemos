@@ -36,9 +36,15 @@ Use **friend**, **availability**, **plan**, **invitation**, and **catch-up rhyth
 - **Plan**: time from availability, title/activity/place/note, friends with invite statuses
 - **Settings**: notification prefs, default duration, first day of week, time format
 
+## Catch-up rhythm (default)
+
+New friends default to about monthly. If `lastMetAt` is empty, cadence baselines from `createdAt` so a brand-new friend is not immediately “Due.” Copy says “No catch-ups logged,” never “never met.” Use **We caught up** on a friend profile for meetings organized outside the app.
+
 ## Invite statuses (per friend)
 
-Not invited · Waiting · Yes · Maybe · No · New time · Moved
+Not sent · Waiting · Yes · Maybe · Can’t make it · Suggest another time · Moved
+
+Internal/automatic: Not sent, Waiting, Moved. User choices: Yes, Maybe, Can’t make it, Suggest another time.
 
 ## Plan statuses
 
@@ -46,7 +52,7 @@ Draft · Waiting · It’s on · Needs another time · Done · Cancelled
 
 ## Invitations
 
-Editable plain text; share via the OS share sheet. After sharing, ask “Mark as invited?” — the OS cannot confirm delivery.
+Editable plain text; share via the OS share sheet. After sharing, ask “Did you send it?” — the OS cannot confirm delivery.
 
 ## Explicitly not V1
 
