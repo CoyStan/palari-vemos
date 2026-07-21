@@ -1,26 +1,26 @@
-import { Feather } from '@expo/vector-icons';
-import type { ComponentProps } from 'react';
+import { Feather } from "@expo/vector-icons";
+import type { ComponentProps } from "react";
 
-import { color } from '../foundation';
+import { color } from "../foundation";
 
-type FeatherName = ComponentProps<typeof Feather>['name'];
+type FeatherName = ComponentProps<typeof Feather>["name"];
 
 /** Outline icon set (ui-ux-pro-max: no emoji as structural icons). */
 export type IconName =
-  | 'calendar'
-  | 'users'
-  | 'chevron-left'
-  | 'chevron-right'
-  | 'x'
-  | 'plus'
-  | 'clock'
-  | 'arrow-left'
-  | 'settings'
-  | 'share'
-  | 'trash-2'
-  | 'check'
-  | 'sun'
-  | 'pause-circle';
+  | "calendar"
+  | "users"
+  | "chevron-left"
+  | "chevron-right"
+  | "x"
+  | "plus"
+  | "clock"
+  | "arrow-left"
+  | "settings"
+  | "share"
+  | "trash-2"
+  | "check"
+  | "sun"
+  | "pause-circle";
 
 type Props = {
   name: IconName;

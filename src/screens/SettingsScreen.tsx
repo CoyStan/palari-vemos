@@ -1,23 +1,23 @@
-import { Alert, Pressable, ScrollView, Share, Switch, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert, Pressable, ScrollView, Switch, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Button } from '../components/Button';
-import { Card } from '../components/Card';
-import { color } from '../foundation';
-import { ensureNotificationPermission } from '../services/reminders';
-import { useApp } from '../state/AppProvider';
-import { cn } from '../ui/cn';
-import type { ReactNode } from 'react';
+import { Button } from "../components/Button";
+import { Card } from "../components/Card";
+import { color } from "../foundation";
+import { ensureNotificationPermission } from "../services/reminders";
+import { useApp } from "../state/AppProvider";
+import { cn } from "../ui/cn";
+import type { ReactNode } from "react";
 
 function hourLabel(hour: number, timeFormat24h: boolean): string {
   if (hour === 24) {
-    return timeFormat24h ? '24:00' : 'Midnight';
+    return timeFormat24h ? "24:00" : "Midnight";
   }
   if (timeFormat24h) {
-    return `${hour.toString().padStart(2, '0')}:00`;
+    return `${hour.toString().padStart(2, "0")}:00`;
   }
-  if (hour === 0) return '12 AM';
-  if (hour === 12) return '12 PM';
+  if (hour === 0) return "12 AM";
+  if (hour === 12) return "12 PM";
   return hour < 12 ? `${hour} AM` : `${hour - 12} PM`;
 }
 
@@ -27,11 +27,9 @@ const CALENDAR_END_HOURS = [18, 19, 20, 21, 22, 23, 24];
 export function SettingsScreen() {
   const {
     data,
-    saveError,
     updateSettings,
     exportData,
     wipeData,
-    retrySave,
     openAvailability,
     openPrivacyPolicy,
   } = useApp();
@@ -55,8 +53,8 @@ export function SettingsScreen() {
       const granted = await ensureNotificationPermission();
       if (!granted) {
         Alert.alert(
-          'Notifications off',
-          'Permission wasn’t granted. You can turn reminders on later in system settings.',
+          "Notifications off",
+          "Permission wasn’t granted. You can turn reminders on later in system settings.",
         );
         return;
       }
@@ -66,29 +64,24 @@ export function SettingsScreen() {
 
   const onExport = async () => {
     Alert.alert(
-      'Export text data',
-      'This shares a JSON file of your So, When? text data. Photos are not included. The file can contain names, phone numbers, notes, and statuses—share carefully.',
+      "Export text data",
+      "This shares a JSON file of your So, When? text data. Photos are not included. The file can contain names, phone numbers, notes, and statuses—share carefully.",
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Export',
+          text: "Export",
           onPress: () => {
             void (async () => {
               const json = await exportData();
-              try {
-                const { writeTempExportJson, deleteTempFile } = await import('../services/media');
-                const uri = await writeTempExportJson(json);
-                if (uri) {
-                  await Share.share({ url: uri, title: 'So, When? data export (photos not included)' });
-                  await deleteTempFile(uri);
-                } else {
-                  await Share.share({
-                    message: json,
-                    title: 'So, When? data export (photos not included)',
-                  });
-                }
-              } catch {
-                Alert.alert('Export ready', 'Could not open the share sheet. Try again.');
+              const { shareJsonExport } =
+                await import("../services/exportShare");
+              const result = await shareJsonExport(json);
+              if (!result.ok) {
+                Alert.alert(
+                  "Export ready",
+                  result.message ??
+                    "Could not open the share sheet. Try again.",
+                );
               }
             })();
           },
@@ -99,18 +92,21 @@ export function SettingsScreen() {
 
   const onWipe = () => {
     Alert.alert(
-      'Delete all data?',
-      'This removes friends, availability, and plans from this phone. It cannot be undone.',
+      "Delete all data?",
+      "This removes friends, availability, and plans from this phone. It cannot be undone.",
       [
-        { text: 'Keep', style: 'cancel' },
+        { text: "Keep", style: "cancel" },
         {
-          text: 'Delete everything',
-          style: 'destructive',
+          text: "Delete everything",
+          style: "destructive",
           onPress: () => {
             void (async () => {
               const result = await wipeData();
               if (!result.ok) {
-                Alert.alert('Could not delete data', result.message ?? 'Something went wrong. Try again.');
+                Alert.alert(
+                  "Could not delete data",
+                  result.message ?? "Something went wrong. Try again.",
+                );
               }
             })();
           },
@@ -120,27 +116,30 @@ export function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-canvas font-sans" edges={['top', 'left', 'right']}>
+    <SafeAreaView
+      className="flex-1 bg-canvas font-sans"
+      edges={["top", "left", "right"]}
+    >
       <ScrollView
         className="flex-1"
         contentContainerClassName="gap-5 px-5 pb-8 pt-3"
         showsVerticalScrollIndicator={false}
       >
         <View className="gap-1">
-          <Text className="font-sans-bold text-[28px] tracking-[-1px] text-ink">Settings</Text>
-          <Text className="text-caption text-muted">Quiet defaults. Everything stays local.</Text>
+          <Text className="font-sans-bold text-[28px] tracking-[-1px] text-ink">
+            Settings
+          </Text>
+          <Text className="text-caption text-muted">
+            Quiet defaults. Everything stays local.
+          </Text>
         </View>
 
-        {saveError ? (
-          <Card className="gap-3 border border-danger bg-surface p-4">
-            <Text className="font-sans-semibold text-body text-danger">Couldn’t save changes</Text>
-            <Text className="text-caption text-muted">{saveError}</Text>
-            <Button label="Try again" variant="secondary" onPress={() => void retrySave()} />
-          </Card>
-        ) : null}
-
         <Section title="Availability">
-          <Button label="Manage availability" variant="secondary" onPress={openAvailability} />
+          <Button
+            label="Manage availability"
+            variant="secondary"
+            onPress={openAvailability}
+          />
         </Section>
 
         <Section title="Plan reminders">
@@ -153,13 +152,13 @@ export function SettingsScreen() {
           <ToggleRow
             label="Plan tomorrow"
             value={settings.notifyPlanTomorrow}
-            onValueChange={(value) => toggle('notifyPlanTomorrow', value)}
+            onValueChange={(value) => toggle("notifyPlanTomorrow", value)}
             disabled={!settings.notificationsEnabled}
           />
           <ToggleRow
             label="Ask if it happened"
             value={settings.notifyAskIfHappened}
-            onValueChange={(value) => toggle('notifyAskIfHappened', value)}
+            onValueChange={(value) => toggle("notifyAskIfHappened", value)}
             disabled={!settings.notificationsEnabled}
           />
         </Section>
@@ -168,26 +167,35 @@ export function SettingsScreen() {
           <ToggleRow
             label="Catch-up nudge"
             value={settings.notifyCatchUpDue}
-            onValueChange={(value) => toggle('notifyCatchUpDue', value)}
+            onValueChange={(value) => toggle("notifyCatchUpDue", value)}
             disabled={!settings.notificationsEnabled}
           />
         </Section>
 
         <Section title="Privacy & data">
           <Text className="text-body text-muted">
-            So, When? stores friends, availability, and plans only on this device.
-            Friends do not need the app. Contacts are never scanned or uploaded —
-            you choose one contact at a time when you want to copy a name or number.
+            So, When? stores friends, availability, and plans only on this
+            device. Friends do not need the app. Contacts are never scanned or
+            uploaded — you choose one contact at a time when you want to copy a
+            name or number.
           </Text>
-          <Button label="Privacy policy" variant="secondary" onPress={openPrivacyPolicy} />
-          <Button label="Export data" variant="secondary" onPress={() => void onExport()} />
+          <Button
+            label="Privacy policy"
+            variant="secondary"
+            onPress={openPrivacyPolicy}
+          />
+          <Button
+            label="Export data"
+            variant="secondary"
+            onPress={() => void onExport()}
+          />
           <Button label="Delete all data" variant="ghost" onPress={onWipe} />
         </Section>
 
         <Section title="About">
           <Text className="text-body text-muted">
-            So, When? is made by Palari Labs, Inc. Version 1 is a private organizer —
-            not a social network.
+            So, When? is made by Palari Labs, Inc. Version 1 is a private
+            organizer — not a social network.
           </Text>
         </Section>
 
@@ -195,21 +203,24 @@ export function SettingsScreen() {
           <ChoiceChips
             label="Default plan duration"
             options={[
-              { value: 60, label: '1 hour' },
-              { value: 90, label: '1.5 hours' },
-              { value: 120, label: '2 hours' },
-              { value: 180, label: '3 hours' },
+              { value: 60, label: "1 hour" },
+              { value: 90, label: "1.5 hours" },
+              { value: 120, label: "2 hours" },
+              { value: 180, label: "3 hours" },
             ]}
             value={settings.defaultDurationMinutes}
-            onChange={(value) => void updateSettings({ defaultDurationMinutes: value })}
+            onChange={(value) =>
+              void updateSettings({ defaultDurationMinutes: value })
+            }
           />
           <ToggleRow
             label="24-hour time"
             value={settings.timeFormat24h}
-            onValueChange={(value) => toggle('timeFormat24h', value)}
+            onValueChange={(value) => toggle("timeFormat24h", value)}
           />
           <Text className="text-caption text-muted">
-            Calendar hours only change how much of the day you see in Week/Day — not your availability.
+            Calendar hours only change how much of the day you see in Week/Day —
+            not your availability.
           </Text>
           <ChoiceChips
             label="Calendar starts at"
@@ -217,7 +228,10 @@ export function SettingsScreen() {
             value={settings.calendarDayStartHour}
             onChange={(value) => {
               const end = Math.max(settings.calendarDayEndHour, value + 1);
-              void updateSettings({ calendarDayStartHour: value, calendarDayEndHour: end });
+              void updateSettings({
+                calendarDayStartHour: value,
+                calendarDayEndHour: end,
+              });
             }}
           />
           <ChoiceChips
@@ -233,7 +247,7 @@ export function SettingsScreen() {
             label="Show names on reminders"
             hint="When off, lock-screen reminders stay generic"
             value={settings.showReminderNames}
-            onValueChange={(value) => toggle('showReminderNames', value)}
+            onValueChange={(value) => toggle("showReminderNames", value)}
             disabled={!settings.notificationsEnabled}
           />
         </Section>
@@ -265,7 +279,12 @@ function ToggleRow({
   disabled?: boolean;
 }) {
   return (
-    <View className={cn('min-h-[52px] flex-row items-center justify-between gap-3 py-1', disabled ? 'opacity-50' : 'opacity-100')}>
+    <View
+      className={cn(
+        "min-h-[52px] flex-row items-center justify-between gap-3 py-1",
+        disabled ? "opacity-50" : "opacity-100",
+      )}
+    >
       <View className="flex-1">
         <Text className="text-body text-ink">{label}</Text>
         {hint ? <Text className="text-caption text-muted">{hint}</Text> : null}
@@ -276,7 +295,7 @@ function ToggleRow({
         disabled={disabled}
         accessibilityLabel={label}
         trackColor={{ false: color.border, true: color.softTeal }}
-        thumbColor={value ? color.primary : '#FFFFFF'}
+        thumbColor={value ? color.primary : "#FFFFFF"}
       />
     </View>
   );
@@ -306,12 +325,14 @@ function ChoiceChips<T extends number>({
               accessibilityState={{ selected }}
               onPress={() => onChange(option.value)}
               className={`min-h-[44px] items-center justify-center rounded-full border px-4 ${
-                selected ? 'border-primary bg-primary-soft' : 'border-border bg-canvas'
+                selected
+                  ? "border-primary bg-primary-soft"
+                  : "border-border bg-canvas"
               }`}
             >
               <Text
                 className={`text-center font-sans-semibold text-caption leading-5 ${
-                  selected ? 'text-primary' : 'text-ink'
+                  selected ? "text-primary" : "text-ink"
                 }`}
               >
                 {option.label}

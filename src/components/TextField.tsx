@@ -1,12 +1,7 @@
-import {
-  Text,
-  TextInput,
-  View,
-  type TextInputProps,
-} from 'react-native';
+import { Text, TextInput, View, type TextInputProps } from "react-native";
 
-import { color } from '../foundation';
-import { cn } from '../ui/cn';
+import { color } from "../foundation";
+import { cn } from "../ui/cn";
 
 type Props = TextInputProps & {
   label: string;
@@ -31,7 +26,7 @@ export function TextField({
         accessibilityLabel={accessibilityLabel ?? label}
         accessibilityHint={hint ?? accessibilityHint}
         className={cn(
-          'min-h-[52px] rounded-control border border-border bg-surface px-4 py-3 text-body text-ink',
+          "min-h-[52px] rounded-control border border-border bg-surface px-4 py-3 text-body text-ink",
           className,
         )}
         style={style}

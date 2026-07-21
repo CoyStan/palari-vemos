@@ -1,8 +1,8 @@
-import type { ReactNode } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import type { ReactNode } from "react";
+import { Pressable, Text, View } from "react-native";
 
-import { color } from '../foundation';
-import { Icon } from './Icon';
+import { color } from "../foundation";
+import { Icon } from "./Icon";
 
 type Props = {
   title: string;

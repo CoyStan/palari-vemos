@@ -1,23 +1,23 @@
-import type { ReactNode } from 'react';
+import type { ReactNode } from "react";
 import {
   Pressable,
   type PressableProps,
   type StyleProp,
   type ViewStyle,
-} from 'react-native';
+} from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withTiming,
-} from 'react-native-reanimated';
+} from "react-native-reanimated";
 
-import { useReduceMotion } from '../ui/useReduceMotion';
+import { useReduceMotion } from "../ui/useReduceMotion";
 
 const PRESS_IN_MS = 120;
 const PRESS_OUT_MS = 160;
 const PRESSED_SCALE = 0.97;
 
-type Props = Omit<PressableProps, 'style'> & {
+type Props = Omit<PressableProps, "style"> & {
   children: ReactNode;
   className?: string;
   style?: StyleProp<ViewStyle>;

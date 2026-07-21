@@ -16,15 +16,7 @@ So, When? does not require an account and does not operate a So, When? backend t
 
 ## Information stored on your device
 
-Depending on how you use the app, So, When? may store locally:
-
-- Friend names and optional phone numbers, preferred share methods, catch-up rhythms, and last-caught-up dates
-- Optional photos you choose for friends or plan memories (copied into app-owned storage when possible)
-- Availability rules and skipped occurrences
-- Plans (time, activity, place, private notes) and per-friend invitation text and reply statuses
-- Settings such as reminder preferences and display defaults
-
-This data is kept in on-device storage. Android backup for app data is disabled in this release.
+Depending on how you use the app, So, When? may store locally: friend names and optional phone numbers, preferred share methods, catch-up rhythms, and last-caught-up dates; optional photos for friends or plan memories (copied into app-owned storage when possible); availability rules and skipped occurrences; plans (time, activity, place, private notes) and per-friend invitation text and reply statuses; and settings such as reminder preferences and display defaults. Android backup for app data is disabled in this release.
 
 ## Contacts
 
@@ -36,21 +28,19 @@ If you grant photo permission, you may attach an optional photo for a friend or 
 
 ## Notifications
 
-Optional local reminders use the device notification system for plan and catch-up nudges. Reminders are scheduled on your device. By default, lock-screen copy stays generic and does not include friend names or plan titles unless you turn on showing names in Settings. This release does not use remote push from a Palari Labs server.
+Optional local reminders use the device notification system for plan and catch-up nudges. By default, lock-screen copy stays generic unless you turn on showing names in Settings. This release does not use remote push from a Palari Labs server.
 
 ## Sharing invitations
 
-When you share an invitation, the message is opened through the Android share sheet or apps you choose (such as WhatsApp, SMS, Telegram, or Messages). Delivery and content handling after you leave So, When? are controlled by those apps and your device—not by a So, When? messaging service. Opening a share sheet is not treated as proof that a message was sent.
+When you share an invitation, the message is opened through the Android share sheet or apps you choose. Delivery after you leave So, When? is controlled by those apps. Opening a share sheet is not treated as proof that a message was sent.
 
 ## Export and deletion
 
-Settings lets you export a JSON copy of your text data (photos are not included in the export). The export can contain names, phone numbers, notes, and statuses—share it carefully.
-
-Settings also lets you delete all So, When? data on this device, which clears local state, cancels scheduled reminders, and removes app-owned media. Uninstalling the app or clearing app data in system settings also removes local So, When? data, subject to how Android works on your device.
+Settings lets you export a JSON copy of your text data (photos are not included). The export can contain names, phone numbers, notes, and statuses—share it carefully. Wipe deletes local state, cancels reminders, and removes app-owned media.
 
 ## What we do not collect in this release
 
-So, When? in this release does not create accounts; does not send friend lists, plans, or invitation text to Palari Labs servers; and does not include analytics, advertising, crash-reporting SDKs, or social login. If we add such services later, we will update this policy and Play Console disclosures before shipping that change.
+This release does not create accounts; does not send friend lists, plans, or invitation text to Palari Labs servers; and does not include analytics, advertising, crash-reporting SDKs, or social login.
 
 ## Children
 
@@ -58,7 +48,7 @@ So, When? is not directed to children under 13. Because this release keeps data 
 
 ## Your choices
 
-You can deny contacts, photos, or notification permissions in system settings; use the app without those features; export or wipe data in Settings; and uninstall the app at any time.
+You can deny contacts, photos, or notification permissions; use the app without those features; export or wipe data in Settings; and uninstall the app at any time.
 
 ## Changes
 
@@ -66,6 +56,4 @@ We may update this policy when the product’s data practices change. The effect
 
 ## Contact
 
-Questions about this policy: **privacy@palari.io**
-
-For Google Play, host this same policy at a public HTTPS URL and paste that URL into Play Console (App content → Privacy policy). The in-app Settings screen also opens this policy.
+Questions about this policy: privacy@palari.io. For Google Play, host the same policy from docs/privacy-policy.html at a public HTTPS URL and paste that URL into Play Console. That public URL is not deployed yet.

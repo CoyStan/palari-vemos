@@ -12,51 +12,85 @@ import type {
   Recurrence,
   ShareMethod,
   SkippedOccurrence,
-} from '../domain/types';
-import { defaultSettings } from '../domain/types';
+} from "../domain/types";
+import { defaultSettings } from "../domain/types";
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
-const SHARE_METHODS: ShareMethod[] = ['whatsapp', 'sms', 'telegram', 'message', 'other'];
-const RHYTHMS: CatchUpRhythm[] = ['weekly', 'monthly', 'quarterly', 'custom', 'none'];
+const SHARE_METHODS: ShareMethod[] = [
+  "whatsapp",
+  "sms",
+  "telegram",
+  "message",
+  "other",
+];
+const RHYTHMS: CatchUpRhythm[] = [
+  "weekly",
+  "monthly",
+  "quarterly",
+  "custom",
+  "none",
+];
 const INVITE_STATUSES: InviteStatus[] = [
-  'not_invited', 'waiting', 'yes', 'maybe', 'no', 'new_time', 'moved',
+  "not_invited",
+  "waiting",
+  "yes",
+  "maybe",
+  "no",
+  "new_time",
+  "moved",
 ];
 const PLAN_STATUSES: PlanStatus[] = [
-  'draft', 'waiting', 'on', 'needs_time', 'done', 'cancelled',
+  "draft",
+  "waiting",
+  "on",
+  "needs_time",
+  "done",
+  "cancelled",
 ];
-const KINDS: AvailabilityKind[] = ['recurring', 'oneoff'];
-const RECURRENCES: Recurrence[] = ['weekly', 'biweekly', 'daily'];
+const KINDS: AvailabilityKind[] = ["recurring", "oneoff"];
+const RECURRENCES: Recurrence[] = ["weekly", "biweekly", "daily"];
+const TONES = ["warm", "casual", "playful"] as const;
 
 export type LoadResult =
-  | { ok: true; data: AppData; warnings: string[] }
-  | { ok: false; reason: 'corrupt' | 'unreadable'; message: string; raw: string | null };
+  | { ok: true; data: AppData; warnings: string[]; healedFromBackup?: boolean }
+  | {
+      ok: false;
+      reason: "corrupt" | "unreadable" | "incompatible";
+      message: string;
+      raw: string | null;
+    };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function asEnum<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
-  return typeof value === 'string' && (allowed as readonly string[]).includes(value)
+function asEnum<T extends string>(
+  value: unknown,
+  allowed: readonly T[],
+  fallback: T,
+): T {
+  return typeof value === "string" &&
+    (allowed as readonly string[]).includes(value)
     ? (value as T)
     : fallback;
 }
 
-function asString(value: unknown, fallback = ''): string {
-  return typeof value === 'string' ? value : fallback;
+function asString(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback;
 }
 
 function asNullableString(value: unknown): string | null {
   if (value === null) return null;
-  return typeof value === 'string' ? value : null;
+  return typeof value === "string" ? value : null;
 }
 
 function asNumber(value: unknown, fallback: number): number {
-  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
 function asBool(value: unknown, fallback: boolean): boolean {
-  return typeof value === 'boolean' ? value : fallback;
+  return typeof value === "boolean" ? value : fallback;
 }
 
 function isIsoDate(value: string): boolean {
@@ -77,7 +111,7 @@ function clampDay(value: number): number {
 
 function todayKey(): string {
   const now = new Date();
-  const p = (n: number) => n.toString().padStart(2, '0');
+  const p = (n: number) => n.toString().padStart(2, "0");
   return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
 }
 
@@ -96,19 +130,47 @@ export function emptyAppData(): AppData {
 function parseSettings(value: unknown): AppSettings {
   const base = defaultSettings();
   if (!isRecord(value)) return base;
-  const start = Math.max(0, Math.min(23, asNumber(value.calendarDayStartHour, base.calendarDayStartHour)));
-  let end = Math.max(1, Math.min(24, asNumber(value.calendarDayEndHour, base.calendarDayEndHour)));
+  const start = Math.max(
+    0,
+    Math.min(
+      23,
+      asNumber(value.calendarDayStartHour, base.calendarDayStartHour),
+    ),
+  );
+  let end = Math.max(
+    1,
+    Math.min(24, asNumber(value.calendarDayEndHour, base.calendarDayEndHour)),
+  );
   if (end <= start) end = Math.min(24, start + 1);
-  const duration = asNumber(value.defaultDurationMinutes, base.defaultDurationMinutes);
+  const duration = asNumber(
+    value.defaultDurationMinutes,
+    base.defaultDurationMinutes,
+  );
   return {
-    notificationsEnabled: asBool(value.notificationsEnabled, base.notificationsEnabled),
+    notificationsEnabled: asBool(
+      value.notificationsEnabled,
+      base.notificationsEnabled,
+    ),
     notifyFreeSlots: asBool(value.notifyFreeSlots, base.notifyFreeSlots),
     notifyCatchUpDue: asBool(value.notifyCatchUpDue, base.notifyCatchUpDue),
-    notifyWaitingFollowUp: asBool(value.notifyWaitingFollowUp, base.notifyWaitingFollowUp),
-    notifyPlanTomorrow: asBool(value.notifyPlanTomorrow, base.notifyPlanTomorrow),
-    notifyAskIfHappened: asBool(value.notifyAskIfHappened, base.notifyAskIfHappened),
-    defaultDurationMinutes: [30, 60, 90, 120, 180].includes(duration) ? duration : base.defaultDurationMinutes,
-    firstDayOfWeek: clampDay(asNumber(value.firstDayOfWeek, base.firstDayOfWeek)),
+    notifyWaitingFollowUp: asBool(
+      value.notifyWaitingFollowUp,
+      base.notifyWaitingFollowUp,
+    ),
+    notifyPlanTomorrow: asBool(
+      value.notifyPlanTomorrow,
+      base.notifyPlanTomorrow,
+    ),
+    notifyAskIfHappened: asBool(
+      value.notifyAskIfHappened,
+      base.notifyAskIfHappened,
+    ),
+    defaultDurationMinutes: [30, 60, 90, 120, 180].includes(duration)
+      ? duration
+      : base.defaultDurationMinutes,
+    firstDayOfWeek: clampDay(
+      asNumber(value.firstDayOfWeek, base.firstDayOfWeek),
+    ),
     timeFormat24h: asBool(value.timeFormat24h, base.timeFormat24h),
     calendarDayStartHour: start,
     calendarDayEndHour: end,
@@ -117,8 +179,13 @@ function parseSettings(value: unknown): AppSettings {
 }
 
 function parseFriend(value: unknown, warnings: string[]): Friend | null {
-  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.name !== 'string' || !value.name.trim()) {
-    warnings.push('Dropped a friend with missing id or name.');
+  if (
+    !isRecord(value) ||
+    typeof value.id !== "string" ||
+    typeof value.name !== "string" ||
+    !value.name.trim()
+  ) {
+    warnings.push("Dropped a friend with missing id or name.");
     return null;
   }
   const createdAt = asString(value.createdAt, new Date().toISOString());
@@ -127,8 +194,8 @@ function parseFriend(value: unknown, warnings: string[]): Friend | null {
     name: value.name.trim(),
     photoUri: asNullableString(value.photoUri),
     phone: asString(value.phone),
-    shareMethod: asEnum(value.shareMethod, SHARE_METHODS, 'message'),
-    rhythm: asEnum(value.rhythm, RHYTHMS, 'monthly'),
+    shareMethod: asEnum(value.shareMethod, SHARE_METHODS, "message"),
+    rhythm: asEnum(value.rhythm, RHYTHMS, "monthly"),
     customDays: Math.max(1, asNumber(value.customDays, 45)),
     lastMetAt: (() => {
       const raw = asNullableString(value.lastMetAt);
@@ -139,12 +206,15 @@ function parseFriend(value: unknown, warnings: string[]): Friend | null {
   };
 }
 
-function parseAvailability(value: unknown, warnings: string[]): AvailabilityRule | null {
-  if (!isRecord(value) || typeof value.id !== 'string') {
-    warnings.push('Dropped an availability rule with missing id.');
+function parseAvailability(
+  value: unknown,
+  warnings: string[],
+): AvailabilityRule | null {
+  if (!isRecord(value) || typeof value.id !== "string") {
+    warnings.push("Dropped an availability rule with missing id.");
     return null;
   }
-  const kind = asEnum(value.kind, KINDS, 'recurring');
+  const kind = asEnum(value.kind, KINDS, "recurring");
   let startMinutes = clampMinutes(asNumber(value.startMinutes, 18 * 60));
   let endMinutes = clampMinutes(asNumber(value.endMinutes, 20 * 60));
   if (endMinutes <= startMinutes) {
@@ -152,73 +222,118 @@ function parseAvailability(value: unknown, warnings: string[]): AvailabilityRule
   }
   const daysOfWeek = Array.isArray(value.daysOfWeek)
     ? value.daysOfWeek
-      .filter((day): day is number => typeof day === 'number')
-      .map(clampDay)
-      .filter((day, index, all) => all.indexOf(day) === index)
+        .filter((day): day is number => typeof day === "number")
+        .map(clampDay)
+        .filter((day, index, all) => all.indexOf(day) === index)
     : [];
   const startDate = asString(value.startDate, todayKey());
   const oneOffDate = asNullableString(value.oneOffDate);
-  if (kind === 'oneoff' && (!oneOffDate || !isDateKey(oneOffDate))) {
+  if (kind === "oneoff" && (!oneOffDate || !isDateKey(oneOffDate))) {
     warnings.push(`Dropped one-time availability ${value.id}: missing date.`);
     return null;
   }
   return {
     id: value.id,
     kind,
-    label: asString(value.label, kind === 'oneoff' ? 'One-time' : 'Free time'),
-    daysOfWeek: kind === 'oneoff' ? [] : daysOfWeek,
+    label: asString(value.label, kind === "oneoff" ? "One-time" : "Free time"),
+    daysOfWeek: kind === "oneoff" ? [] : daysOfWeek,
     startMinutes,
     endMinutes,
-    recurrence: asEnum(value.recurrence, RECURRENCES, 'weekly'),
+    recurrence: asEnum(value.recurrence, RECURRENCES, "weekly"),
     startDate: isDateKey(startDate) ? startDate : todayKey(),
     endDate: (() => {
       const raw = asNullableString(value.endDate);
       return raw && isDateKey(raw) ? raw : null;
     })(),
-    oneOffDate: kind === 'oneoff' ? oneOffDate : null,
+    oneOffDate: kind === "oneoff" ? oneOffDate : null,
     enabled: value.enabled !== false,
     createdAt: asString(value.createdAt, new Date().toISOString()),
   };
 }
 
-function parsePlanFriend(value: unknown, friendIds: Set<string>, warnings: string[]): PlanFriend | null {
-  if (!isRecord(value) || typeof value.friendId !== 'string') {
+function parsePlanFriend(
+  value: unknown,
+  friendIds: Set<string>,
+  planStatus: PlanStatus,
+  warnings: string[],
+): PlanFriend | null {
+  if (!isRecord(value) || typeof value.friendId !== "string") {
     return null;
   }
-  if (!friendIds.has(value.friendId)) {
-    warnings.push(`Removed plan invitee ${value.friendId}: friend missing.`);
+  const friendId = value.friendId;
+  const snapshot = asNullableString(value.displayNameSnapshot);
+  const isSnapshotRow = friendId.startsWith("gone_");
+  const known = friendIds.has(friendId);
+
+  if (!known && !isSnapshotRow) {
+    if ((planStatus === "done" || planStatus === "cancelled") && snapshot) {
+      return {
+        friendId: `gone_${friendId}`,
+        status: asEnum(value.status, INVITE_STATUSES, "yes"),
+        invitationText: asString(value.invitationText),
+        inviteTone: asEnum(value.inviteTone, TONES, "warm"),
+        invitationCustomized: asBool(value.invitationCustomized, false),
+        sentAt: asNullableString(value.sentAt),
+        displayNameSnapshot: snapshot,
+      };
+    }
+    warnings.push(`Removed plan invitee ${friendId}: friend missing.`);
     return null;
   }
+
   return {
-    friendId: value.friendId,
-    status: asEnum(value.status, INVITE_STATUSES, 'not_invited'),
+    friendId,
+    status: asEnum(value.status, INVITE_STATUSES, "not_invited"),
     invitationText: asString(value.invitationText),
-    inviteTone: asEnum(value.inviteTone, ['warm', 'casual', 'playful'] as const, 'warm'),
+    inviteTone: asEnum(value.inviteTone, TONES, "warm"),
     invitationCustomized: asBool(value.invitationCustomized, false),
     sentAt: asNullableString(value.sentAt),
-    displayNameSnapshot: asNullableString(value.displayNameSnapshot),
+    displayNameSnapshot: snapshot,
   };
 }
 
-function parsePlan(value: unknown, friendIds: Set<string>, warnings: string[]): Plan | null {
-  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.startAt !== 'string') {
-    warnings.push('Dropped a plan with missing id or start time.');
+function parsePlan(
+  value: unknown,
+  friendIds: Set<string>,
+  warnings: string[],
+): Plan | null {
+  if (
+    !isRecord(value) ||
+    typeof value.id !== "string" ||
+    typeof value.startAt !== "string"
+  ) {
+    warnings.push("Dropped a plan with missing id or start time.");
     return null;
   }
   if (!isIsoDate(value.startAt)) {
     warnings.push(`Dropped plan ${value.id}: invalid startAt.`);
     return null;
   }
+  const status = asEnum(value.status, PLAN_STATUSES, "draft");
   const endAt = asString(value.endAt, value.startAt);
   const friends = Array.isArray(value.friends)
     ? value.friends
-      .map((item) => parsePlanFriend(item, friendIds, warnings))
-      .filter((item): item is PlanFriend => item !== null)
+        .map((item) => parsePlanFriend(item, friendIds, status, warnings))
+        .filter((item): item is PlanFriend => item !== null)
+    : [];
+
+  // Attendance: only keep IDs that appear on the plan; never invent from yes-status alone.
+  const attendedFriendIds = Array.isArray(value.attendedFriendIds)
+    ? value.attendedFriendIds
+        .filter((id): id is string => typeof id === "string")
+        .filter((id) =>
+          friends.some(
+            (item) =>
+              item.friendId === id ||
+              item.friendId === `gone_${id}` ||
+              id.startsWith("gone_"),
+          ),
+        )
     : [];
 
   return {
     id: value.id,
-    title: asString(value.title, 'Catch up'),
+    title: asString(value.title, "Catch up"),
     activity: asString(value.activity),
     place: asString(value.place),
     note: asString(value.note),
@@ -226,9 +341,10 @@ function parsePlan(value: unknown, friendIds: Set<string>, warnings: string[]): 
     endAt: isIsoDate(endAt) ? endAt : value.startAt,
     availabilityKey: asNullableString(value.availabilityKey),
     friends,
-    status: asEnum(value.status, PLAN_STATUSES, 'draft'),
+    status,
     memoryNote: asString(value.memoryNote),
     memoryPhotoUri: asNullableString(value.memoryPhotoUri),
+    attendedFriendIds,
     completedAt: asNullableString(value.completedAt),
     cancelledAt: asNullableString(value.cancelledAt),
     createdAt: asString(value.createdAt, new Date().toISOString()),
@@ -236,7 +352,10 @@ function parsePlan(value: unknown, friendIds: Set<string>, warnings: string[]): 
   };
 }
 
-function parseSkipped(value: unknown, ruleIds: Set<string>): SkippedOccurrence | null {
+function parseSkipped(
+  value: unknown,
+  ruleIds: Set<string>,
+): SkippedOccurrence | null {
   if (!isRecord(value)) return null;
   const ruleId = asString(value.ruleId);
   const date = asString(value.date);
@@ -246,7 +365,7 @@ function parseSkipped(value: unknown, ruleIds: Set<string>): SkippedOccurrence |
 
 /** Migrate any stored payload (versioned or legacy) into validated AppData. */
 export function migrateAndValidate(raw: string | null): LoadResult {
-  if (raw === null || raw === '') {
+  if (raw === null || raw === "") {
     return { ok: true, data: emptyAppData(), warnings: [] };
   }
 
@@ -256,8 +375,8 @@ export function migrateAndValidate(raw: string | null): LoadResult {
   } catch {
     return {
       ok: false,
-      reason: 'corrupt',
-      message: 'Your saved data could not be read (invalid JSON).',
+      reason: "corrupt",
+      message: "Your saved data could not be read (invalid JSON).",
       raw,
     };
   }
@@ -265,22 +384,36 @@ export function migrateAndValidate(raw: string | null): LoadResult {
   if (!isRecord(parsed)) {
     return {
       ok: false,
-      reason: 'corrupt',
-      message: 'Your saved data has an unexpected shape.',
+      reason: "corrupt",
+      message: "Your saved data has an unexpected shape.",
+      raw,
+    };
+  }
+
+  if (
+    typeof parsed.schemaVersion === "number" &&
+    parsed.schemaVersion > SCHEMA_VERSION
+  ) {
+    return {
+      ok: false,
+      reason: "incompatible",
+      message: `This save was written by a newer So, When? (schema ${parsed.schemaVersion}). Update the app to open it.`,
       raw,
     };
   }
 
   const warnings: string[] = [];
   const friends = Array.isArray(parsed.friends)
-    ? parsed.friends.map((item) => parseFriend(item, warnings)).filter((item): item is Friend => item !== null)
+    ? parsed.friends
+        .map((item) => parseFriend(item, warnings))
+        .filter((item): item is Friend => item !== null)
     : [];
   const friendIds = new Set(friends.map((friend) => friend.id));
 
   const availability = Array.isArray(parsed.availability)
     ? parsed.availability
-      .map((item) => parseAvailability(item, warnings))
-      .filter((item): item is AvailabilityRule => item !== null)
+        .map((item) => parseAvailability(item, warnings))
+        .filter((item): item is AvailabilityRule => item !== null)
     : [];
   const ruleIds = new Set(availability.map((rule) => rule.id));
 
@@ -297,10 +430,13 @@ export function migrateAndValidate(raw: string | null): LoadResult {
   }
 
   const plans = Array.isArray(parsed.plans)
-    ? parsed.plans.map((item) => parsePlan(item, friendIds, warnings)).filter((item): item is Plan => item !== null)
+    ? parsed.plans
+        .map((item) => parsePlan(item, friendIds, warnings))
+        .filter((item): item is Plan => item !== null)
     : [];
 
-  const onboardingComplete = asBool(parsed.onboardingComplete, false) || friends.length > 0;
+  const onboardingComplete =
+    asBool(parsed.onboardingComplete, false) || friends.length > 0;
 
   return {
     ok: true,
@@ -315,4 +451,9 @@ export function migrateAndValidate(raw: string | null): LoadResult {
     },
     warnings,
   };
+}
+
+/** True when raw is missing (fresh install), not corrupt. */
+export function isAbsentRaw(raw: string | null): boolean {
+  return raw === null || raw === "";
 }

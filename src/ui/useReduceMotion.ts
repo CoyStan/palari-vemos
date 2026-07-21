@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { AccessibilityInfo } from 'react-native';
+import { useEffect, useState } from "react";
+import { AccessibilityInfo } from "react-native";
 
 /**
  * Shared reduce-motion flag for all animation primitives
@@ -16,7 +16,7 @@ export function useReduceMotion(): boolean {
       }
     });
     const sub = AccessibilityInfo.addEventListener(
-      'reduceMotionChanged',
+      "reduceMotionChanged",
       setReduceMotion,
     );
     return () => {

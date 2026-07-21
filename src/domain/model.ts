@@ -10,7 +10,7 @@ import type {
   PlanStatus,
   ShareMethod,
   SkippedOccurrence,
-} from './types';
+} from "./types";
 import {
   addDays,
   calendarDaysBetween,
@@ -20,60 +20,67 @@ import {
   MONTH_LABELS_SHORT,
   parseDateKey,
   startOfDay,
-} from './time';
+} from "./time";
 
 export const SHARE_OPTIONS: { value: ShareMethod; label: string }[] = [
-  { value: 'whatsapp', label: 'WhatsApp' },
-  { value: 'sms', label: 'SMS' },
-  { value: 'telegram', label: 'Telegram' },
-  { value: 'message', label: 'Messages' },
-  { value: 'other', label: 'Other' },
+  { value: "whatsapp", label: "WhatsApp" },
+  { value: "sms", label: "SMS" },
+  { value: "telegram", label: "Telegram" },
+  { value: "message", label: "Messages" },
+  { value: "other", label: "Other" },
 ];
 
-export const RHYTHM_OPTIONS: { value: CatchUpRhythm; label: string; days: number }[] = [
-  { value: 'weekly', label: 'About weekly', days: 7 },
-  { value: 'monthly', label: 'About monthly', days: 30 },
-  { value: 'quarterly', label: 'Every three months', days: 90 },
-  { value: 'custom', label: 'Custom', days: 45 },
-  { value: 'none', label: 'No schedule', days: 0 },
+export const RHYTHM_OPTIONS: {
+  value: CatchUpRhythm;
+  label: string;
+  days: number;
+}[] = [
+  { value: "weekly", label: "About weekly", days: 7 },
+  { value: "monthly", label: "About monthly", days: 30 },
+  { value: "quarterly", label: "Every three months", days: 90 },
+  { value: "custom", label: "Custom", days: 45 },
+  { value: "none", label: "No schedule", days: 0 },
 ];
 
 export const ACTIVITY_OPTIONS = [
-  'drinks',
-  'dinner',
-  'coffee',
-  'walk',
-  'games',
-  'catch up',
+  "drinks",
+  "dinner",
+  "coffee",
+  "walk",
+  "games",
+  "catch up",
 ] as const;
 
 export const INVITE_STATUS_LABELS: Record<InviteStatus, string> = {
-  not_invited: 'Not invited',
-  waiting: 'Waiting',
-  yes: 'Yes',
-  maybe: 'Maybe',
-  no: 'No',
-  new_time: 'New time',
-  moved: 'Moved',
+  not_invited: "Not invited",
+  waiting: "Waiting",
+  yes: "Yes",
+  maybe: "Maybe",
+  no: "No",
+  new_time: "New time",
+  moved: "Moved",
 };
 
 export const PLAN_STATUS_LABELS: Record<PlanStatus, string> = {
-  draft: 'Draft',
-  waiting: 'Waiting',
-  on: 'It’s on',
-  needs_time: 'Needs another time',
-  done: 'Done',
-  cancelled: 'Cancelled',
+  draft: "Draft",
+  waiting: "Waiting",
+  on: "It’s on",
+  needs_time: "Needs another time",
+  done: "Done",
+  cancelled: "Cancelled",
 };
 
 export function rhythmDays(friend: Friend): number | null {
-  if (friend.rhythm === 'none') {
+  if (friend.rhythm === "none") {
     return null;
   }
-  if (friend.rhythm === 'custom') {
+  if (friend.rhythm === "custom") {
     return Math.max(1, friend.customDays || 45);
   }
-  return RHYTHM_OPTIONS.find((option) => option.value === friend.rhythm)?.days ?? null;
+  return (
+    RHYTHM_OPTIONS.find((option) => option.value === friend.rhythm)?.days ??
+    null
+  );
 }
 
 /** Cadence baseline: lastMetAt, else createdAt — never treat “no catch-up logged” as overdue on day one. */
@@ -81,71 +88,88 @@ export function catchUpBaselineIso(friend: Friend): string {
   return friend.lastMetAt ?? friend.createdAt;
 }
 
-export function catchUpStatus(friend: Friend, now = new Date()): FriendCatchUpStatus {
+export function catchUpStatus(
+  friend: Friend,
+  now = new Date(),
+): FriendCatchUpStatus {
   const days = rhythmDays(friend);
   if (days === null) {
-    return 'none';
+    return "none";
   }
   const since = daysSince(catchUpBaselineIso(friend), now);
   if (since === null) {
-    return 'none';
+    return "none";
   }
   if (since >= days) {
-    return 'due';
+    return "due";
   }
   if (since >= days * 0.7) {
-    return 'soon';
+    return "soon";
   }
-  return 'none';
+  return "none";
 }
 
-export function catchUpLabel(status: FriendCatchUpStatus, friend?: Friend): string {
-  if (status === 'due') {
-    return 'Due';
+export function catchUpLabel(
+  status: FriendCatchUpStatus,
+  friend?: Friend,
+): string {
+  if (status === "due") {
+    return "Due";
   }
-  if (status === 'soon') {
-    return 'Soon';
+  if (status === "soon") {
+    return "Soon";
   }
-  if (friend && friend.rhythm === 'none') {
-    return 'No schedule';
+  if (friend && friend.rhythm === "none") {
+    return "No schedule";
   }
-  return 'On track';
+  return "On track";
 }
 
 /** Warm last-met copy — no guilt framing. Never claims you have never met. */
-export function lastMetLabel(lastMetAt: string | null, now = new Date()): string {
+export function lastMetLabel(
+  lastMetAt: string | null,
+  now = new Date(),
+): string {
   const days = daysSince(lastMetAt, now);
   if (days === null) {
-    return 'No catch-ups logged';
+    return "No catch-ups logged";
   }
   if (days === 0) {
-    return 'Caught up today';
+    return "Caught up today";
   }
   if (days === 1) {
-    return 'Caught up yesterday';
+    return "Caught up yesterday";
   }
   if (days < 14) {
     return `Caught up ${days} days ago`;
   }
   if (days < 60) {
     const weeks = Math.round(days / 7);
-    return weeks === 1 ? 'Caught up about a week ago' : `Caught up about ${weeks} weeks ago`;
+    return weeks === 1
+      ? "Caught up about a week ago"
+      : `Caught up about ${weeks} weeks ago`;
   }
   const months = Math.round(days / 30);
-  return months <= 1 ? 'Caught up about a month ago' : `Caught up about ${months} months ago`;
+  return months <= 1
+    ? "Caught up about a month ago"
+    : `Caught up about ${months} months ago`;
 }
 
-export function sortFriendsForPicker(friends: Friend[], plans: Plan[], now = new Date()): Friend[] {
+export function sortFriendsForPicker(
+  friends: Friend[],
+  plans: Plan[],
+  now = new Date(),
+): Friend[] {
   const upcomingFriendIds = new Set(
     plans
-      .filter((plan) => plan.status !== 'done' && plan.status !== 'cancelled')
+      .filter((plan) => plan.status !== "done" && plan.status !== "cancelled")
       .filter((plan) => new Date(plan.startAt).getTime() >= now.getTime())
       .flatMap((plan) => plan.friends.map((item) => item.friendId)),
   );
 
   return [...friends].sort((a, b) => {
-    const aDue = catchUpStatus(a, now) === 'due' ? 0 : 1;
-    const bDue = catchUpStatus(b, now) === 'due' ? 0 : 1;
+    const aDue = catchUpStatus(a, now) === "due" ? 0 : 1;
+    const bDue = catchUpStatus(b, now) === "due" ? 0 : 1;
     if (aDue !== bDue) {
       return aDue - bDue;
     }
@@ -158,30 +182,32 @@ export function sortFriendsForPicker(friends: Friend[], plans: Plan[], now = new
   });
 }
 
-export function computePlanStatus(friends: Plan['friends']): PlanStatus {
+export function computePlanStatus(friends: Plan["friends"]): PlanStatus {
   if (friends.length === 0) {
-    return 'draft';
+    return "draft";
   }
-  const active = friends.filter((item) => item.status !== 'moved');
+  const active = friends.filter((item) => item.status !== "moved");
   if (active.length === 0) {
-    return 'cancelled';
+    return "cancelled";
   }
-  const anyYes = active.some((item) => item.status === 'yes');
+  const anyYes = active.some((item) => item.status === "yes");
   if (anyYes) {
-    return 'on';
+    return "on";
   }
-  const allBlocked = active.every((item) => (
-    item.status === 'no' || item.status === 'new_time'
-  ));
+  const allBlocked = active.every(
+    (item) => item.status === "no" || item.status === "new_time",
+  );
   if (allBlocked) {
-    return 'needs_time';
+    return "needs_time";
   }
-  const anyWaiting = active.some((item) => item.status === 'waiting' || item.status === 'maybe');
+  const anyWaiting = active.some(
+    (item) => item.status === "waiting" || item.status === "maybe",
+  );
   if (anyWaiting) {
-    return 'waiting';
+    return "waiting";
   }
-  const anyInvited = active.some((item) => item.status !== 'not_invited');
-  return anyInvited ? 'waiting' : 'draft';
+  const anyInvited = active.some((item) => item.status !== "not_invited");
+  return anyInvited ? "waiting" : "draft";
 }
 
 export function buildInviteText(input: {
@@ -193,13 +219,13 @@ export function buildInviteText(input: {
   timeFormat24h: boolean;
   tone?: InviteTone;
 }): string {
-  const name = input.name.trim() || 'there';
+  const name = input.name.trim() || "there";
   const when = formatPlanWhen(input.startAt, input.timeFormat24h, input.endAt);
   const activity = input.activity?.trim();
   const place = input.place?.trim();
-  const tone = input.tone ?? 'warm';
+  const tone = input.tone ?? "warm";
 
-  if (tone === 'casual') {
+  if (tone === "casual") {
     if (activity && place) {
       return `Hey ${name} — ${activity} at ${place}, ${when}. In?`;
     }
@@ -209,7 +235,7 @@ export function buildInviteText(input: {
     return `Hey ${name} — I’m free ${when}. Want to catch up?`;
   }
 
-  if (tone === 'playful') {
+  if (tone === "playful") {
     if (activity && place) {
       return `${name} — ${activity} at ${place}, ${when}. Sounds good?`;
     }
@@ -229,15 +255,31 @@ export function buildInviteText(input: {
 }
 
 /** Alpha: no generic insight claims about life outside So, When?. */
-export function buildInsight(_friends: Friend[], _plans: Plan[], _now = new Date()): string | null {
+export function buildInsight(
+  _friends: Friend[],
+  _plans: Plan[],
+  _now = new Date(),
+): string | null {
   return null;
 }
 
-export function formatPlanWhen(iso: string, timeFormat24h: boolean, endIso?: string): string {
+export function formatPlanWhen(
+  iso: string,
+  timeFormat24h: boolean,
+  endIso?: string,
+): string {
   const date = new Date(iso);
-  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const day = days[date.getDay()] ?? '';
-  const month = MONTH_LABELS_SHORT[date.getMonth()] ?? '';
+  const days = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+  const day = days[date.getDay()] ?? "";
+  const month = MONTH_LABELS_SHORT[date.getMonth()] ?? "";
   const dayNum = date.getDate();
   const year = date.getFullYear();
   const nowYear = new Date().getFullYear();
@@ -248,20 +290,21 @@ export function formatPlanWhen(iso: string, timeFormat24h: boolean, endIso?: str
     const endMin = end.getHours() * 60 + end.getMinutes();
     timePart = `${formatClock(startMin, timeFormat24h)}–${formatClock(endMin, timeFormat24h)}`;
   }
-  const datePart = year !== nowYear
-    ? `${day}, ${month} ${dayNum}, ${year}`
-    : `${day}, ${month} ${dayNum}`;
+  const datePart =
+    year !== nowYear
+      ? `${day}, ${month} ${dayNum}, ${year}`
+      : `${day}, ${month} ${dayNum}`;
   return `${datePart} from ${timePart}`;
 }
 
 export function formatClock(minutes: number, timeFormat24h: boolean): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  const mm = m.toString().padStart(2, '0');
+  const mm = m.toString().padStart(2, "0");
   if (timeFormat24h) {
-    return `${h.toString().padStart(2, '0')}:${mm}`;
+    return `${h.toString().padStart(2, "0")}:${mm}`;
   }
-  const suffix = h >= 12 ? 'PM' : 'AM';
+  const suffix = h >= 12 ? "PM" : "AM";
   const hour12 = h % 12 === 0 ? 12 : h % 12;
   return m === 0 ? `${hour12} ${suffix}` : `${hour12}:${mm} ${suffix}`;
 }
@@ -276,7 +319,7 @@ export function intervalsOverlap(
 }
 
 export function isActivePlan(plan: Plan): boolean {
-  return plan.status !== 'cancelled' && plan.status !== 'done';
+  return plan.status !== "cancelled" && plan.status !== "done";
 }
 
 export function proposePlanWindow(
@@ -307,8 +350,12 @@ export function slotConflictsWithPlans(
   const endMs = new Date(endAt).getTime();
   return plans.some((plan) => {
     if (!isActivePlan(plan)) return false;
-    if (options?.excludePlanId && plan.id === options.excludePlanId) return false;
-    if (options?.availabilityKey && plan.availabilityKey === options.availabilityKey) {
+    if (options?.excludePlanId && plan.id === options.excludePlanId)
+      return false;
+    if (
+      options?.availabilityKey &&
+      plan.availabilityKey === options.availabilityKey
+    ) {
       return true;
     }
     return intervalsOverlap(
@@ -351,13 +398,16 @@ export function suggestSlotsForScheduling(
   const duration = Math.max(30, options?.durationMinutes ?? 60);
   const from = options?.from ?? startOfDay(new Date());
 
-  const carve = (window: ConcreteSlot, startMinutes: number): ConcreteSlot | null => {
+  const carve = (
+    window: ConcreteSlot,
+    startMinutes: number,
+  ): ConcreteSlot | null => {
     const endMinutes = Math.min(window.endMinutes, startMinutes + duration);
     if (endMinutes - startMinutes < 30) {
       return null;
     }
     const candidate: ConcreteSlot = {
-      key: `${window.ruleId ?? 'free'}:${window.date}:${startMinutes}`,
+      key: `${window.ruleId ?? "free"}:${window.date}:${startMinutes}`,
       ruleId: window.ruleId,
       date: window.date,
       startMinutes,
@@ -374,7 +424,11 @@ export function suggestSlotsForScheduling(
 
   const collect = (dayCount: number): ConcreteSlot[] => {
     const windows = expandAvailability(rules, skipped, from, dayCount)
-      .filter((slot) => !slotIsBooked(slot, plans) && slot.endMinutes - slot.startMinutes >= 30)
+      .filter(
+        (slot) =>
+          !slotIsBooked(slot, plans) &&
+          slot.endMinutes - slot.startMinutes >= 30,
+      )
       .sort((a, b) => a.startAt.localeCompare(b.startAt));
 
     const picks: ConcreteSlot[] = [];
@@ -404,10 +458,7 @@ export function suggestSlotsForScheduling(
         let cursor = window.startMinutes + duration;
         while (cursor + 30 <= window.endMinutes && picks.length < count) {
           const pick = carve(window, cursor);
-          if (
-            pick
-            && !picks.some((item) => item.key === pick.key)
-          ) {
+          if (pick && !picks.some((item) => item.key === pick.key)) {
             picks.push(pick);
           }
           cursor += duration;
@@ -452,12 +503,12 @@ export function expandAvailability(
       }
 
       let matches = false;
-      if (rule.kind === 'oneoff') {
+      if (rule.kind === "oneoff") {
         matches = rule.oneOffDate === dateKey;
       } else if (rule.daysOfWeek.includes(dow)) {
-        if (rule.recurrence === 'daily' || rule.recurrence === 'weekly') {
+        if (rule.recurrence === "daily" || rule.recurrence === "weekly") {
           matches = true;
-        } else if (rule.recurrence === 'biweekly') {
+        } else if (rule.recurrence === "biweekly") {
           const startDate = parseDateKey(rule.startDate);
           const diffDays = calendarDaysBetween(startDate, day);
           matches = Math.floor(diffDays / 7) % 2 === 0;
@@ -481,7 +532,7 @@ export function expandAvailability(
         endMinutes: rule.endMinutes,
         startAt,
         endAt,
-        label: rule.label || 'You’re free',
+        label: rule.label || "You’re free",
       });
     }
   }
@@ -490,10 +541,10 @@ export function expandAvailability(
 }
 
 export type TimelineItem =
-  | { type: 'availability'; sortAt: string; slot: ConcreteSlot }
-  | { type: 'plan'; sortAt: string; plan: Plan }
-  | { type: 'catch_up'; sortAt: string; friend: Friend }
-  | { type: 'did_it_happen'; sortAt: string; plan: Plan };
+  | { type: "availability"; sortAt: string; slot: ConcreteSlot }
+  | { type: "plan"; sortAt: string; plan: Plan }
+  | { type: "catch_up"; sortAt: string; friend: Friend }
+  | { type: "did_it_happen"; sortAt: string; plan: Plan };
 
 /**
  * Home list: future active plans + future unbooked free times.
@@ -514,41 +565,49 @@ export function buildTimeline(
     if (!isActivePlan(plan)) continue;
     if (spotlightId && plan.id === spotlightId) continue;
     if (new Date(plan.endAt).getTime() < nowMs) continue;
-    items.push({ type: 'plan', sortAt: plan.startAt, plan });
+    items.push({ type: "plan", sortAt: plan.startAt, plan });
   }
 
   for (const slot of slots) {
     if (slotIsBooked(slot, plans)) continue;
     if (new Date(slot.endAt).getTime() < nowMs) continue;
-    items.push({ type: 'availability', sortAt: slot.startAt, slot });
+    items.push({ type: "availability", sortAt: slot.startAt, slot });
   }
 
   items.sort((a, b) => a.sortAt.localeCompare(b.sortAt));
 
   const unresolved = plans
-    .filter((plan) => (
-      isActivePlan(plan)
-      && new Date(plan.endAt).getTime() < nowMs
-      && new Date(plan.endAt).getTime() > nowMs - 3 * 24 * 60 * 60 * 1000
-      && (plan.status === 'on' || plan.status === 'waiting')
-    ))
+    .filter(
+      (plan) =>
+        isActivePlan(plan) &&
+        new Date(plan.endAt).getTime() < nowMs &&
+        new Date(plan.endAt).getTime() > nowMs - 3 * 24 * 60 * 60 * 1000 &&
+        (plan.status === "on" || plan.status === "waiting"),
+    )
     .sort((a, b) => b.endAt.localeCompare(a.endAt))[0];
 
   if (unresolved) {
-    items.unshift({ type: 'did_it_happen', sortAt: unresolved.endAt, plan: unresolved });
+    items.unshift({
+      type: "did_it_happen",
+      sortAt: unresolved.endAt,
+      plan: unresolved,
+    });
   }
 
   const upcomingFriendIds = new Set(
     plans
-      .filter((plan) => isActivePlan(plan) && new Date(plan.startAt).getTime() >= nowMs)
+      .filter(
+        (plan) =>
+          isActivePlan(plan) && new Date(plan.startAt).getTime() >= nowMs,
+      )
       .flatMap((plan) => plan.friends.map((item) => item.friendId)),
   );
   const nudge = friends
-    .filter((friend) => catchUpStatus(friend, now) === 'due')
+    .filter((friend) => catchUpStatus(friend, now) === "due")
     .filter((friend) => !upcomingFriendIds.has(friend.id))
     .sort((a, b) => a.name.localeCompare(b.name))[0];
   if (nudge) {
-    items.push({ type: 'catch_up', sortAt: now.toISOString(), friend: nudge });
+    items.push({ type: "catch_up", sortAt: now.toISOString(), friend: nudge });
   }
 
   return items;

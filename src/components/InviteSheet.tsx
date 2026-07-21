@@ -1,16 +1,16 @@
-import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useEffect, useState } from "react";
+import { Pressable, ScrollView, Text, View } from "react-native";
 
-import { AnimatedDialog } from './AnimatedDialog';
-import { Avatar } from './Avatar';
-import { Button } from './Button';
-import { Icon } from './Icon';
-import { formatClock, lastMetLabel } from '../domain/model';
-import { formatDayHeading } from '../domain/time';
-import type { ConcreteSlot } from '../domain/types';
-import { color } from '../foundation';
-import { useApp } from '../state/AppProvider';
-import { cn } from '../ui/cn';
+import { AnimatedDialog } from "./AnimatedDialog";
+import { Avatar } from "./Avatar";
+import { Button } from "./Button";
+import { Icon } from "./Icon";
+import { formatClock, lastMetLabel } from "../domain/model";
+import { formatDayHeading } from "../domain/time";
+import type { ConcreteSlot } from "../domain/types";
+import { color } from "../foundation";
+import { useApp } from "../state/AppProvider";
+import { cn } from "../ui/cn";
 
 type Props = {
   slot: ConcreteSlot | null;
@@ -57,7 +57,7 @@ export function InviteSheet({ slot, onClose, onMakePlan }: Props) {
             </Text>
             <Text className="font-sans-bold text-section text-ink">
               {formatClock(slot.startMinutes, data.settings.timeFormat24h)}
-              {' – '}
+              {" – "}
               {formatClock(slot.endMinutes, data.settings.timeFormat24h)}
             </Text>
             <Text className="text-body text-muted">
@@ -95,8 +95,8 @@ export function InviteSheet({ slot, onClose, onMakePlan }: Props) {
                       accessibilityLabel={friend.name}
                       onPress={() => toggle(friend.id)}
                       className={cn(
-                        'min-h-[56px] flex-row items-center gap-3 rounded-control px-3 py-2',
-                        selected ? 'bg-primary-soft' : 'active:bg-canvas',
+                        "min-h-[56px] flex-row items-center gap-3 rounded-control px-3 py-2",
+                        selected ? "bg-primary-soft" : "active:bg-canvas",
                       )}
                     >
                       <Avatar
@@ -114,14 +114,18 @@ export function InviteSheet({ slot, onClose, onMakePlan }: Props) {
                       </View>
                       <View
                         className={cn(
-                          'h-6 w-6 items-center justify-center rounded-full border',
+                          "h-6 w-6 items-center justify-center rounded-full border",
                           selected
-                            ? 'border-primary bg-primary'
-                            : 'border-border bg-surface',
+                            ? "border-primary bg-primary"
+                            : "border-border bg-surface",
                         )}
                       >
                         {selected ? (
-                          <Icon name="check" size={14} color={color.primaryText} />
+                          <Icon
+                            name="check"
+                            size={14}
+                            color={color.primaryText}
+                          />
                         ) : null}
                       </View>
                     </Pressable>
@@ -135,8 +139,8 @@ export function InviteSheet({ slot, onClose, onMakePlan }: Props) {
             <Button
               label={
                 selectedIds.length > 0
-                  ? `Make a plan with ${selectedIds.length === 1 ? '1 person' : `${selectedIds.length} people`}`
-                  : 'Make a plan'
+                  ? `Make a plan with ${selectedIds.length === 1 ? "1 person" : `${selectedIds.length} people`}`
+                  : "Make a plan"
               }
               onPress={() => onMakePlan(slot, selectedIds)}
             />

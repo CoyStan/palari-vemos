@@ -1,18 +1,18 @@
-import { useMemo, useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { useMemo, useState } from "react";
+import { Alert, Pressable, Text, View } from "react-native";
 
-import { Avatar } from '../components/Avatar';
-import { Button } from '../components/Button';
-import { Card } from '../components/Card';
-import { Icon } from '../components/Icon';
-import { Screen } from '../components/Screen';
-import { ScreenHeader } from '../components/ScreenHeader';
-import { TextField } from '../components/TextField';
-import { ACTIVITY_OPTIONS, catchUpStatus, formatClock } from '../domain/model';
-import { formatDayHeading } from '../domain/time';
-import { color, shadowSoft } from '../foundation';
-import { useApp } from '../state/AppProvider';
-import { cn } from '../ui/cn';
+import { Avatar } from "../components/Avatar";
+import { Button } from "../components/Button";
+import { Card } from "../components/Card";
+import { Icon } from "../components/Icon";
+import { Screen } from "../components/Screen";
+import { ScreenHeader } from "../components/ScreenHeader";
+import { TextField } from "../components/TextField";
+import { ACTIVITY_OPTIONS, catchUpStatus, formatClock } from "../domain/model";
+import { formatDayHeading } from "../domain/time";
+import { color, shadowSoft } from "../foundation";
+import { useApp } from "../state/AppProvider";
+import { cn } from "../ui/cn";
 
 export function CreatePlanScreen() {
   const {
@@ -26,20 +26,20 @@ export function CreatePlanScreen() {
     data,
   } = useApp();
 
-  const [step, setStep] = useState<'friends' | 'details'>(
-    selectedFriendIds.length > 0 ? 'details' : 'friends',
+  const [step, setStep] = useState<"friends" | "details">(
+    selectedFriendIds.length > 0 ? "details" : "friends",
   );
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [activity, setActivity] = useState('');
-  const [customActivity, setCustomActivity] = useState('');
-  const [place, setPlace] = useState('');
-  const [note, setNote] = useState('');
-  const [title, setTitle] = useState('');
+  const [activity, setActivity] = useState("");
+  const [customActivity, setCustomActivity] = useState("");
+  const [place, setPlace] = useState("");
+  const [note, setNote] = useState("");
+  const [title, setTitle] = useState("");
   const [saving, setSaving] = useState(false);
 
   const slotLabel = useMemo(() => {
     if (!selectedSlot) {
-      return '';
+      return "";
     }
     const start = new Date(selectedSlot.startAt);
     return `${formatDayHeading(start)} · ${formatClock(selectedSlot.startMinutes, data.settings.timeFormat24h)}`;
@@ -49,19 +49,22 @@ export function CreatePlanScreen() {
     return (
       <Screen>
         <ScreenHeader title="Make a plan" onBack={goBack} />
-        <Text className="text-body text-muted">Pick a free time from When first.</Text>
+        <Text className="text-body text-muted">
+          Pick a free time from When first.
+        </Text>
       </Screen>
     );
   }
 
-  const resolvedActivity = activity === 'custom' ? customActivity.trim() : activity;
+  const resolvedActivity =
+    activity === "custom" ? customActivity.trim() : activity;
 
   const onContinue = () => {
     if (selectedFriendIds.length === 0) {
-      Alert.alert('Choose friends', 'Select at least one person to invite.');
+      Alert.alert("Choose friends", "Select at least one person to invite.");
       return;
     }
-    setStep('details');
+    setStep("details");
   };
 
   const onCreate = async () => {
@@ -74,7 +77,10 @@ export function CreatePlanScreen() {
         note,
       });
       if (!result.ok) {
-        Alert.alert('Could not create invitation', result.message ?? 'Something went wrong. Try again.');
+        Alert.alert(
+          "Could not create invitation",
+          result.message ?? "Something went wrong. Try again.",
+        );
       }
     } finally {
       setSaving(false);
@@ -84,30 +90,36 @@ export function CreatePlanScreen() {
   return (
     <Screen contentClassName="gap-4">
       <ScreenHeader
-        title={step === 'friends' ? 'Who’s coming?' : 'Plan details'}
-        onBack={step === 'friends' ? goBack : () => setStep('friends')}
+        title={step === "friends" ? "Who’s coming?" : "Plan details"}
+        onBack={step === "friends" ? goBack : () => setStep("friends")}
       />
       <View className="gap-1">
         <View className="self-start rounded-full bg-primary-soft px-3 py-1.5">
-          <Text className="text-caption font-sans-semibold text-primary">{slotLabel}</Text>
+          <Text className="text-caption font-sans-semibold text-primary">
+            {slotLabel}
+          </Text>
         </View>
         <Text className="text-caption text-muted">
-          {step === 'friends' ? 'Step 1 of 2 · Pick your people' : 'Step 2 of 2 · Ready to invite'}
+          {step === "friends"
+            ? "Step 1 of 2 · Pick your people"
+            : "Step 2 of 2 · Ready to invite"}
         </Text>
       </View>
 
-      {step === 'friends' ? (
+      {step === "friends" ? (
         <>
           {sortedFriends.length === 0 ? (
             <Card className="gap-3">
-              <Text className="text-body text-muted">Add a friend before making a plan.</Text>
+              <Text className="text-body text-muted">
+                Add a friend before making a plan.
+              </Text>
               <Button label="Add a friend" onPress={openAddFriend} />
             </Card>
           ) : (
             <View className="gap-2">
               {sortedFriends.map((friend) => {
                 const selected = selectedFriendIds.includes(friend.id);
-                const due = catchUpStatus(friend) === 'due';
+                const due = catchUpStatus(friend) === "due";
                 return (
                   <Pressable
                     key={friend.id}
@@ -116,39 +128,59 @@ export function CreatePlanScreen() {
                     accessibilityLabel={friend.name}
                     onPress={() => toggleFriendSelection(friend.id)}
                     className={cn(
-                      'flex-row items-center gap-3 rounded-card p-3',
-                      selected ? 'border border-primary bg-primary-soft' : 'bg-surface',
+                      "flex-row items-center gap-3 rounded-card p-3",
+                      selected
+                        ? "border border-primary bg-primary-soft"
+                        : "bg-surface",
                     )}
                     style={selected ? undefined : shadowSoft}
                   >
-                    <Avatar name={friend.name} photoUri={friend.photoUri} size={44} />
+                    <Avatar
+                      name={friend.name}
+                      photoUri={friend.photoUri}
+                      size={44}
+                    />
                     <View className="flex-1">
-                      <Text className="font-sans-bold text-body text-ink">{friend.name}</Text>
+                      <Text className="font-sans-bold text-body text-ink">
+                        {friend.name}
+                      </Text>
                       <Text className="text-caption text-muted">
-                        {due ? 'Due for a catch-up' : 'Available'}
+                        {due ? "Due for a catch-up" : "Available"}
                       </Text>
                     </View>
                     <View
                       className={cn(
-                        'h-6 w-6 items-center justify-center rounded-full border',
-                        selected ? 'border-primary bg-primary' : 'border-border',
+                        "h-6 w-6 items-center justify-center rounded-full border",
+                        selected
+                          ? "border-primary bg-primary"
+                          : "border-border",
                       )}
                     >
-                      {selected ? <Icon name="check" size={14} color={color.primaryText} /> : null}
+                      {selected ? (
+                        <Icon
+                          name="check"
+                          size={14}
+                          color={color.primaryText}
+                        />
+                      ) : null}
                     </View>
                   </Pressable>
                 );
               })}
             </View>
           )}
-          <Button label="Continue" onPress={onContinue} disabled={selectedFriendIds.length === 0} />
+          <Button
+            label="Continue"
+            onPress={onContinue}
+            disabled={selectedFriendIds.length === 0}
+          />
         </>
       ) : (
         <>
           <Card className="gap-2 p-4">
             <Text className="text-body text-ink">
               {selectedFriendIds.length === 1
-                ? `You’ll invite ${sortedFriends.find((f) => f.id === selectedFriendIds[0])?.name ?? 'one friend'}.`
+                ? `You’ll invite ${sortedFriends.find((f) => f.id === selectedFriendIds[0])?.name ?? "one friend"}.`
                 : `You’ll invite ${selectedFriendIds.length} people.`}
             </Text>
             <Text className="text-caption text-muted">
@@ -163,8 +195,12 @@ export function CreatePlanScreen() {
             onPress={() => setDetailsOpen((open) => !open)}
             className="min-h-[44px] flex-row items-center justify-between rounded-control border border-border bg-surface px-4 py-3"
           >
-            <Text className="font-sans-semibold text-body text-ink">Add a detail</Text>
-            <Text className="text-caption text-muted">{detailsOpen ? 'Hide' : 'Show'}</Text>
+            <Text className="font-sans-semibold text-body text-ink">
+              Add a detail
+            </Text>
+            <Text className="text-caption text-muted">
+              {detailsOpen ? "Hide" : "Show"}
+            </Text>
           </Pressable>
 
           {detailsOpen ? (
@@ -177,38 +213,56 @@ export function CreatePlanScreen() {
               />
 
               <View className="gap-2">
-                <Text className="text-caption font-sans-semibold text-ink">Activity (optional)</Text>
+                <Text className="text-caption font-sans-semibold text-ink">
+                  Activity (optional)
+                </Text>
                 <View className="flex-row flex-wrap gap-2">
                   {ACTIVITY_OPTIONS.map((option) => {
                     const selected = activity === option;
                     return (
                       <Pressable
                         key={option}
-                        onPress={() => setActivity(selected ? '' : option)}
+                        onPress={() => setActivity(selected ? "" : option)}
                         className={cn(
-                          'min-h-[44px] items-center justify-center rounded-full border px-4',
-                          selected ? 'border-primary bg-primary-soft' : 'border-border bg-surface',
+                          "min-h-[44px] items-center justify-center rounded-full border px-4",
+                          selected
+                            ? "border-primary bg-primary-soft"
+                            : "border-border bg-surface",
                         )}
                       >
-                        <Text className={cn('text-center font-sans-semibold text-caption leading-5', selected ? 'text-primary' : 'text-ink')}>
+                        <Text
+                          className={cn(
+                            "text-center font-sans-semibold text-caption leading-5",
+                            selected ? "text-primary" : "text-ink",
+                          )}
+                        >
                           {option}
                         </Text>
                       </Pressable>
                     );
                   })}
                   <Pressable
-                    onPress={() => setActivity(activity === 'custom' ? '' : 'custom')}
+                    onPress={() =>
+                      setActivity(activity === "custom" ? "" : "custom")
+                    }
                     className={cn(
-                      'min-h-[44px] items-center justify-center rounded-full border px-4',
-                      activity === 'custom' ? 'border-primary bg-primary-soft' : 'border-border bg-surface',
+                      "min-h-[44px] items-center justify-center rounded-full border px-4",
+                      activity === "custom"
+                        ? "border-primary bg-primary-soft"
+                        : "border-border bg-surface",
                     )}
                   >
-                    <Text className={cn('text-center font-sans-semibold text-caption leading-5', activity === 'custom' ? 'text-primary' : 'text-ink')}>
+                    <Text
+                      className={cn(
+                        "text-center font-sans-semibold text-caption leading-5",
+                        activity === "custom" ? "text-primary" : "text-ink",
+                      )}
+                    >
                       custom
                     </Text>
                   </Pressable>
                 </View>
-                {activity === 'custom' ? (
+                {activity === "custom" ? (
                   <TextField
                     label="Custom activity"
                     value={customActivity}
@@ -233,7 +287,11 @@ export function CreatePlanScreen() {
             </View>
           ) : null}
 
-          <Button label="Create invitation" loading={saving} onPress={() => void onCreate()} />
+          <Button
+            label="Create invitation"
+            loading={saving}
+            onPress={() => void onCreate()}
+          />
         </>
       )}
     </Screen>

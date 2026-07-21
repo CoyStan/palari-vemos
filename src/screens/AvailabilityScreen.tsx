@@ -1,28 +1,31 @@
-import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { useState } from "react";
+import { Pressable, Text, View } from "react-native";
 
-import { AnimatedDialog } from '../components/AnimatedDialog';
-import { Button } from '../components/Button';
-import { Card } from '../components/Card';
-import { Icon } from '../components/Icon';
-import { PressableScale } from '../components/PressableScale';
-import { Screen } from '../components/Screen';
-import { ScreenHeader } from '../components/ScreenHeader';
-import { formatClock } from '../domain/model';
-import { DAY_LABELS } from '../domain/time';
-import type { AvailabilityRule } from '../domain/types';
-import { color } from '../foundation';
-import { hapticTick } from '../services/haptics';
-import { useApp } from '../state/AppProvider';
-import { cn } from '../ui/cn';
+import { AnimatedDialog } from "../components/AnimatedDialog";
+import { Button } from "../components/Button";
+import { Card } from "../components/Card";
+import { Icon } from "../components/Icon";
+import { PressableScale } from "../components/PressableScale";
+import { Screen } from "../components/Screen";
+import { ScreenHeader } from "../components/ScreenHeader";
+import { formatClock } from "../domain/model";
+import { DAY_LABELS } from "../domain/time";
+import type { AvailabilityRule } from "../domain/types";
+import { color } from "../foundation";
+import { hapticTick } from "../services/haptics";
+import { useApp } from "../state/AppProvider";
+import { cn } from "../ui/cn";
 
-function formatRuleSummary(rule: AvailabilityRule, timeFormat24h: boolean): string {
-  if (rule.kind === 'oneoff') {
+function formatRuleSummary(
+  rule: AvailabilityRule,
+  timeFormat24h: boolean,
+): string {
+  if (rule.kind === "oneoff") {
     const date = rule.oneOffDate ?? rule.startDate;
     return `One-time · ${date} · ${formatClock(rule.startMinutes, timeFormat24h)} – ${formatClock(rule.endMinutes, timeFormat24h)}`;
   }
-  const days = rule.daysOfWeek.map((d) => DAY_LABELS[d]).join(', ');
-  const freq = rule.recurrence === 'biweekly' ? 'every 2 wks' : 'weekly';
+  const days = rule.daysOfWeek.map((d) => DAY_LABELS[d]).join(", ");
+  const freq = rule.recurrence === "biweekly" ? "every 2 wks" : "weekly";
   return `${days} · ${formatClock(rule.startMinutes, timeFormat24h)} – ${formatClock(rule.endMinutes, timeFormat24h)} · ${freq}`;
 }
 
@@ -35,10 +38,12 @@ export function AvailabilityScreen() {
     setAvailabilityEnabled,
     deleteAvailability,
   } = useApp();
-  const [pendingDelete, setPendingDelete] = useState<AvailabilityRule | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<AvailabilityRule | null>(
+    null,
+  );
 
-  const recurring = data.availability.filter((r) => r.kind === 'recurring');
-  const oneoffs = data.availability.filter((r) => r.kind === 'oneoff');
+  const recurring = data.availability.filter((r) => r.kind === "recurring");
+  const oneoffs = data.availability.filter((r) => r.kind === "oneoff");
   const timeFormat24h = data.settings.timeFormat24h;
 
   const onToggle = (rule: AvailabilityRule) => {
@@ -61,8 +66,12 @@ export function AvailabilityScreen() {
         onPress={() => openEditAvailability(rule.id)}
         className="min-h-[44px] flex-1 justify-center"
       >
-        <Text className="font-sans-semibold text-body text-ink">{rule.label}</Text>
-        <Text className="mt-0.5 text-caption text-muted">{formatRuleSummary(rule, timeFormat24h)}</Text>
+        <Text className="font-sans-semibold text-body text-ink">
+          {rule.label}
+        </Text>
+        <Text className="mt-0.5 text-caption text-muted">
+          {formatRuleSummary(rule, timeFormat24h)}
+        </Text>
         {!rule.enabled ? (
           <Text className="mt-1 text-caption italic text-muted">
             Paused — won’t appear in your timeline
@@ -74,11 +83,13 @@ export function AvailabilityScreen() {
         <Pressable
           accessibilityRole="switch"
           accessibilityState={{ checked: rule.enabled }}
-          accessibilityLabel={rule.enabled ? `Pause ${rule.label}` : `Resume ${rule.label}`}
+          accessibilityLabel={
+            rule.enabled ? `Pause ${rule.label}` : `Resume ${rule.label}`
+          }
           onPress={() => onToggle(rule)}
           className={cn(
-            'h-8 w-[52px] items-center justify-center rounded-full',
-            rule.enabled ? 'bg-primary' : 'bg-border',
+            "h-8 w-[52px] items-center justify-center rounded-full",
+            rule.enabled ? "bg-primary" : "bg-border",
           )}
         >
           <View
@@ -91,7 +102,10 @@ export function AvailabilityScreen() {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`Delete ${rule.label}`}
-        onPress={() => { hapticTick(); setPendingDelete(rule); }}
+        onPress={() => {
+          hapticTick();
+          setPendingDelete(rule);
+        }}
         className="h-10 w-10 items-center justify-center"
       >
         <Icon name="trash-2" size={18} color={color.muted} />
@@ -108,14 +122,17 @@ export function AvailabilityScreen() {
       {data.availability.length === 0 ? (
         <Card>
           <Text className="text-body text-muted">
-            No availability set yet. Add some free windows and they'll appear here.
+            No availability set yet. Add some free windows and they'll appear
+            here.
           </Text>
         </Card>
       ) : null}
 
       {recurring.length > 0 ? (
         <View className="gap-2">
-          <Text className="font-sans-bold text-section text-ink">Recurring</Text>
+          <Text className="font-sans-bold text-section text-ink">
+            Recurring
+          </Text>
           {recurring.map((rule) => renderRuleCard(rule, true))}
         </View>
       ) : null}
