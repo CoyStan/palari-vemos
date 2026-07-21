@@ -5,10 +5,12 @@
 import assert from "node:assert/strict";
 
 import {
+  markInviteSentState,
   markPlanDoneState,
   moveFriendToSlotState,
   removeFriend,
   updateAvailabilityRule,
+  updateInvitationTextState,
   type AvailabilityInput,
 } from "../src/domain/mutations";
 import type {
@@ -33,6 +35,11 @@ import {
 import { deferred, WriteQueue } from "../src/persistence/writeQueue";
 import { resolveOwnedMediaExtension } from "../src/services/mediaUri";
 import { shareJsonExportWithIo } from "../src/services/exportShareCore";
+import {
+  createFakeReminderIo,
+  ReminderCoordinator,
+} from "../src/services/reminderCoordinator";
+import { normalizeAttendedFriendIds } from "../src/persistence/migrate";
 
 const now = new Date("2026-07-21T12:00:00.000Z");
 
@@ -580,7 +587,278 @@ async function main() {
     assert.ok(adapter.store.get(BACKUP_KEY));
   }
 
+  // --- expanded storage matrix ---
+  {
+    // Future primary + valid older backup => incompatible, zero writes
+    const adapter = memoryAdapter({
+      [STORAGE_KEY]: validPayload({ schemaVersion: SCHEMA_VERSION + 2 }),
+      [BACKUP_KEY]: validPayload({
+        friends: [
+          {
+            id: "a",
+            name: "Ana",
+            rhythm: "monthly",
+            createdAt: now.toISOString(),
+          },
+        ],
+      }),
+    });
+    const before = new Map(adapter.store);
+    const loaded = await loadAppData(adapter);
+    assert.equal(loaded.ok, false);
+    if (!loaded.ok) assert.equal(loaded.reason, "incompatible");
+    assert.deepEqual(
+      [...adapter.store.entries()].sort(),
+      [...before.entries()].sort(),
+    );
+  }
+
+  {
+    // Corrupt primary + future backup => incompatible, zero writes
+    const adapter = memoryAdapter({
+      [STORAGE_KEY]: "{not-json",
+      [BACKUP_KEY]: validPayload({ schemaVersion: SCHEMA_VERSION + 3 }),
+    });
+    const before = adapter.store.get(BACKUP_KEY);
+    const loaded = await loadAppData(adapter);
+    assert.equal(loaded.ok, false);
+    if (!loaded.ok) assert.equal(loaded.reason, "incompatible");
+    assert.equal(adapter.store.get(BACKUP_KEY), before);
+    assert.equal(adapter.store.get(STORAGE_KEY), "{not-json");
+  }
+
+  {
+    // Primary missing + backup read failure => not empty install
+    const adapter: StorageAdapter & { store: Map<string, string> } = {
+      store: new Map(),
+      getItem: async (key) => {
+        if (key === BACKUP_KEY) throw new Error("io fail");
+        return null;
+      },
+      setItem: async (key, value) => {
+        adapter.store.set(key, value);
+      },
+      multiRemove: async (keys) => {
+        for (const key of keys) adapter.store.delete(key);
+      },
+    };
+    const loaded = await loadAppData(adapter);
+    assert.equal(loaded.ok, false);
+    if (!loaded.ok) assert.equal(loaded.reason, "unreadable");
+  }
+
+  {
+    // Primary IO fail + valid backup => recover with warning
+    const adapter: StorageAdapter & { store: Map<string, string> } = {
+      store: new Map([
+        [
+          BACKUP_KEY,
+          validPayload({
+            friends: [
+              {
+                id: "z",
+                name: "Zoe",
+                rhythm: "monthly",
+                createdAt: now.toISOString(),
+              },
+            ],
+          }),
+        ],
+      ]),
+      getItem: async (key) => {
+        if (key === STORAGE_KEY) throw new Error("primary io");
+        return adapter.store.get(key) ?? null;
+      },
+      setItem: async (key, value) => {
+        adapter.store.set(key, value);
+      },
+      multiRemove: async (keys) => {
+        for (const key of keys) adapter.store.delete(key);
+      },
+    };
+    const loaded = await loadAppData(adapter);
+    assert.equal(loaded.ok, true);
+    if (loaded.ok) {
+      assert.equal(loaded.healedFromBackup, true);
+      assert.equal(loaded.data.friends[0]?.name, "Zoe");
+      assert.ok(adapter.store.get(STORAGE_KEY)?.includes("Zoe"));
+    }
+  }
+
+  {
+    // Current-schema malformed (missing arrays) must not suppress valid backup
+    const malformed = JSON.stringify({
+      schemaVersion: SCHEMA_VERSION,
+      onboardingComplete: true,
+    });
+    const adapter = memoryAdapter({
+      [STORAGE_KEY]: malformed,
+      [BACKUP_KEY]: validPayload({
+        friends: [
+          {
+            id: "m",
+            name: "Mo",
+            rhythm: "monthly",
+            createdAt: now.toISOString(),
+          },
+        ],
+      }),
+    });
+    const loaded = await loadAppData(adapter);
+    assert.equal(loaded.ok, true);
+    if (loaded.ok) {
+      assert.equal(loaded.healedFromBackup, true);
+      assert.equal(loaded.data.friends[0]?.name, "Mo");
+    }
+    const alone = migrateAndValidate(malformed);
+    assert.equal(alone.ok, false);
+    if (!alone.ok) assert.equal(alone.reason, "corrupt");
+  }
+
+  {
+    // Attendance tombstone normalization
+    const friends = [planFriend("gone_a", "yes")];
+    assert.deepEqual(
+      normalizeAttendedFriendIds(["a", "gone_a", "missing"], friends),
+      ["gone_a"],
+    );
+  }
+
+  {
+    // Ghost active plan with no participants is cancelled
+    const ghost = migrateAndValidate(
+      JSON.stringify({
+        schemaVersion: SCHEMA_VERSION,
+        friends: [],
+        availability: [],
+        skipped: [],
+        plans: [
+          {
+            id: "ghost",
+            startAt: new Date(2026, 6, 23, 19, 0).toISOString(),
+            endAt: new Date(2026, 6, 23, 20, 0).toISOString(),
+            friends: [{ friendId: "missing", status: "yes" }],
+            status: "on",
+          },
+        ],
+        settings: {},
+      }),
+    );
+    assert.equal(ghost.ok, true);
+    if (ghost.ok) {
+      assert.equal(ghost.data.plans[0]?.status, "cancelled");
+    }
+  }
+
+  // --- invitation integrity ---
+  {
+    let data: AppData = {
+      ...emptyAppData(),
+      friends: [friend({ id: "a", name: "Ana" })],
+      plans: [
+        basePlan({
+          id: "p1",
+          friends: [planFriend("a", "yes")],
+          status: "on",
+        }),
+      ],
+    };
+    data = markInviteSentState(data, "p1", "a", false);
+    assert.equal(data.plans[0]?.friends[0]?.status, "yes");
+
+    data = {
+      ...data,
+      plans: [
+        basePlan({
+          id: "p2",
+          friends: [
+            { ...planFriend("a", "waiting"), sentAt: now.toISOString() },
+          ],
+          status: "waiting",
+        }),
+      ],
+    };
+    data = markInviteSentState(data, "p2", "a", false);
+    assert.equal(data.plans[0]?.friends[0]?.status, "not_invited");
+  }
+
+  {
+    let data: AppData = {
+      ...emptyAppData(),
+      friends: [friend({ id: "a", name: "Ana" })],
+      plans: [
+        basePlan({
+          id: "p1",
+          friends: [
+            {
+              ...planFriend("a", "not_invited"),
+              invitationText: "Hello Ana",
+              invitationCustomized: false,
+            },
+          ],
+        }),
+      ],
+    };
+    data = updateInvitationTextState(data, "p1", "a", "Hello Ana", false);
+    assert.equal(data.plans[0]?.friends[0]?.invitationCustomized, false);
+    data = updateInvitationTextState(
+      data,
+      "p1",
+      "a",
+      "Hello Ana — coffee?",
+      true,
+    );
+    assert.equal(data.plans[0]?.friends[0]?.invitationCustomized, true);
+  }
+
+  // --- reminder coordinator ---
+  {
+    const io = createFakeReminderIo();
+    const coord = new ReminderCoordinator(io);
+    const enabled = {
+      ...emptyAppData(),
+      settings: {
+        ...emptyAppData().settings,
+        notificationsEnabled: true,
+        notifyPlanTomorrow: true,
+      },
+      plans: [
+        basePlan({
+          id: "p1",
+          startAt: new Date(2026, 6, 24, 19, 0).toISOString(),
+          endAt: new Date(2026, 6, 24, 20, 0).toISOString(),
+        }),
+      ],
+    };
+
+    await coord.schedule(enabled, 1);
+    const firstCount = io.scheduled.length;
+    assert.ok(firstCount >= 1);
+    await coord.schedule(enabled, 1);
+    assert.equal(io.scheduled.length, firstCount); // same revision: no duplicates
+
+    io.holdNextCancel = true;
+    io.gate = deferred<void>();
+    const stale = coord.schedule(enabled, 2);
+    await Promise.resolve();
+    const resetP = coord.resetAndCancel();
+    io.gate.resolve();
+    await resetP;
+    await stale;
+    assert.equal(io.scheduled.length, 0);
+
+    // Older revision cannot overwrite newer after a fresh schedule
+    const io2 = createFakeReminderIo();
+    const coord2 = new ReminderCoordinator(io2);
+    await coord2.schedule(enabled, 5);
+    const mid = io2.scheduled.length;
+    assert.ok(mid >= 1);
+    await coord2.schedule(enabled, 3); // older
+    assert.equal(io2.scheduled.length, mid);
+  }
+
   console.log("hardening tests: ok");
+  process.stdout.write("");
 }
 
 main().catch((error) => {
