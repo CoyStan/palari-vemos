@@ -54,14 +54,14 @@ function NavItem({
     >
       <View
         className={cn(
-          'min-h-[52px] items-center justify-center gap-1 rounded-full',
+          'min-h-[52px] items-center justify-center gap-1 rounded-full px-2',
           active && 'bg-primary-soft',
         )}
       >
         <Icon name={icon} size={22} color={tint} />
         <Text
           className={cn(
-            'text-caption font-sans-semibold',
+            'text-center text-caption font-sans-semibold leading-4',
             active ? 'text-primary' : 'text-muted',
           )}
         >

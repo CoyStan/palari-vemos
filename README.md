@@ -1,6 +1,6 @@
 # So, When?
 
-So, When? is the tiny Palari Labs app that turns “we should catch up sometime” into an actual plan — local-only, friends never need the app.
+So, When? is the tiny Palari Labs, Inc. app that turns “we should catch up sometime” into an actual plan — local-only, friends never need the app.
 
 ## Stack
 
@@ -33,4 +33,4 @@ Prefer NativeWind `className` for UI. Keep brand colors in sync between `tailwin
 
 ## Release
 
-Google Play / EAS notes: [docs/PLAY_RELEASE.md](docs/PLAY_RELEASE.md). Package id: `com.palarilabs.vemos`.
+Google Play / EAS notes: [docs/PLAY_RELEASE.md](docs/PLAY_RELEASE.md). Package id: `com.palarilabs.vemos` (legacy). Publisher: Palari Labs, Inc.

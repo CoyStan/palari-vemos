@@ -17,7 +17,7 @@ import {
   expandAvailability,
   sortFriendsForPicker,
 } from '../domain/model';
-import { startOfDay } from '../domain/time';
+import { startOfDay, formatDateKey, parseDateKey } from '../domain/time';
 import type {
   AppData,
   AppSettings,
@@ -39,8 +39,11 @@ import {
   saveAppData,
 } from '../persistence/storage';
 import { rescheduleReminders } from '../services/reminders';
+import { shareInviteMessage } from '../services/share';
 
 export type TabId = 'when' | 'friends' | 'settings';
+
+export type WhenMode = 'list' | 'week' | 'day';
 
 export type ScreenId =
   | 'loading'
@@ -56,7 +59,8 @@ export type ScreenId =
   | 'availability'
   | 'createPlan'
   | 'planDetail'
-  | 'moveFriend';
+  | 'moveFriend'
+  | 'privacyPolicy';
 
 type FriendInput = {
   name: string;
@@ -81,6 +85,10 @@ type AppContextValue = {
   activePlanId: string | null;
   activeFriendId: string | null;
   moveFriendId: string | null;
+  whenMode: WhenMode;
+  whenFocusDate: Date;
+  setWhenMode: (mode: WhenMode) => void;
+  setWhenFocusDate: (date: Date) => void;
   timeline: ReturnType<typeof buildTimeline>;
   slots: ConcreteSlot[];
   sortedFriends: Friend[];
@@ -95,6 +103,7 @@ type AppContextValue = {
   openFriendProfile: (friendId: string) => void;
   openAddAvailability: () => void;
   openAvailability: () => void;
+  openPrivacyPolicy: () => void;
   openOnboarding: () => void;
   openCreatePlan: (slot: ConcreteSlot, friendIds?: string[]) => void;
   openPlanDetail: (planId: string) => void;
@@ -143,6 +152,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [activePlanId, setActivePlanId] = useState<string | null>(null);
   const [activeFriendId, setActiveFriendId] = useState<string | null>(null);
   const [moveFriendId, setMoveFriendId] = useState<string | null>(null);
+  const [whenMode, setWhenMode] = useState<WhenMode>('list');
+  const [whenFocusDateKey, setWhenFocusDateKey] = useState(() => formatDateKey(startOfDay(new Date())));
+
+  const whenFocusDate = useMemo(
+    () => startOfDay(parseDateKey(whenFocusDateKey)),
+    [whenFocusDateKey],
+  );
+
+  const setWhenFocusDate = useCallback((date: Date) => {
+    setWhenFocusDateKey(formatDateKey(startOfDay(date)));
+  }, []);
 
   const screen: ScreenId = stack[stack.length - 1] ?? 'loading';
 
@@ -268,6 +288,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const openAvailability = useCallback(() => {
     push('availability');
+  }, [push]);
+
+  const openPrivacyPolicy = useCallback(() => {
+    push('privacyPolicy');
   }, [push]);
 
   const openOnboarding = useCallback(() => {
@@ -548,14 +572,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await commit({ ...data, plans: nextPlans });
   }, [activePlan, commit, data]);
 
-  const shareInvite = useCallback(async (_friendId: string, message: string) => {
-    try {
-      await Share.share({ message });
-      return true;
-    } catch {
-      return false;
-    }
-  }, []);
+  const shareInvite = useCallback(async (friendId: string, message: string) => {
+    const friend = data.friends.find((item) => item.id === friendId);
+    return shareInviteMessage({
+      message,
+      method: friend?.shareMethod ?? 'other',
+      phone: friend?.phone,
+    });
+  }, [data.friends]);
 
   const markPlanStatus = useCallback(async (status: PlanStatus) => {
     if (!activePlan) {
@@ -678,6 +702,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     activePlanId,
     activeFriendId,
     moveFriendId,
+    whenMode,
+    whenFocusDate,
+    setWhenMode,
+    setWhenFocusDate,
     timeline,
     slots,
     sortedFriends,
@@ -692,6 +720,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     openFriendProfile,
     openAddAvailability,
     openAvailability,
+    openPrivacyPolicy,
     openOnboarding,
     openCreatePlan,
     openPlanDetail,
@@ -717,10 +746,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     retryLoad: hydrate,
   }), [
     ready, loadError, data, screen, tab, selectedSlot, selectedFriendIds,
-    activePlanId, activeFriendId, moveFriendId, timeline, slots, sortedFriends,
+    activePlanId, activeFriendId, moveFriendId, whenMode, whenFocusDate,
+    setWhenFocusDate, timeline, slots, sortedFriends,
     activePlan, activeFriend, goWhen, goFriends, goSettings, goBack, openAddFriend,
     openEditFriend, openFriendProfile, openAddAvailability, openAvailability,
-    openOnboarding, openCreatePlan,
+    openPrivacyPolicy, openOnboarding, openCreatePlan,
     openPlanDetail, toggleFriendSelection, saveFriend, deleteFriend,
     addAvailability, skipOccurrence, deleteAvailability, setAvailabilityEnabled,
     savePlanMemory, completeOnboarding, createPlan, updatePlan,

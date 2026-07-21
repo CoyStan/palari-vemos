@@ -104,7 +104,7 @@ export function FriendsScreen() {
                       </View>
                       <View
                         className={cn(
-                          'rounded-full px-3 py-1',
+                          'items-center justify-center rounded-full px-3 py-1.5',
                           status === 'due' && 'bg-coral-soft',
                           status === 'soon' && 'bg-primary-soft',
                           status === 'none' && 'bg-canvas',
@@ -112,7 +112,7 @@ export function FriendsScreen() {
                       >
                         <Text
                           className={cn(
-                            'text-caption font-sans-semibold',
+                            'text-center text-caption font-sans-semibold leading-5',
                             status === 'due' && 'text-coral-deep',
                             status === 'soon' && 'text-primary',
                             status === 'none' && 'text-muted',

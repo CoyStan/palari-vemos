@@ -4,8 +4,10 @@
     "strict": true
   },
   "include": [
-    "**/*.ts",
-    "**/*.tsx",
+    "App.tsx",
+    "index.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
     "nativewind-env.d.ts",
     "global.css"
   ]

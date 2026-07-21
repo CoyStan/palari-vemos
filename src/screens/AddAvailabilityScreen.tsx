@@ -188,7 +188,7 @@ export function AddAvailabilityScreen() {
                 >
                   <Text
                     className={cn(
-                      'font-sans-bold text-caption',
+                      'text-center font-sans-bold text-caption leading-5',
                       selected ? 'text-white' : 'text-ink',
                     )}
                   >
@@ -250,7 +250,7 @@ export function AddAvailabilityScreen() {
                     : 'bg-surface border border-border',
                 )}
               >
-                <Text className={cn('font-sans-semibold text-caption', recurrence === id ? 'text-primary' : 'text-ink')}>
+                <Text className={cn('text-center font-sans-semibold text-caption leading-5', recurrence === id ? 'text-primary' : 'text-ink')}>
                   {lbl}
                 </Text>
               </Pressable>

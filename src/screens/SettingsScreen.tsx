@@ -24,7 +24,7 @@ const CALENDAR_START_HOURS = [5, 6, 7, 8, 9, 10];
 const CALENDAR_END_HOURS = [18, 19, 20, 21, 22, 23, 24];
 
 export function SettingsScreen() {
-  const { data, updateSettings, exportData, wipeData, openAvailability } = useApp();
+  const { data, updateSettings, exportData, wipeData, openAvailability, openPrivacyPolicy } = useApp();
   const settings = data.settings;
 
   const calendarStartOptions = CALENDAR_START_HOURS.map((hour) => ({
@@ -190,16 +190,16 @@ export function SettingsScreen() {
             Friends do not need the app. Contacts are never scanned or uploaded —
             you choose one contact at a time when you want to copy a name or number.
           </Text>
+          <Button label="Privacy policy" variant="secondary" onPress={openPrivacyPolicy} />
           <Button label="Export data" variant="secondary" onPress={() => void onExport()} />
           <Button label="Delete all data" variant="ghost" onPress={onWipe} />
         </Section>
 
         <Section title="About">
           <Text className="text-body text-muted">
-            So, When? is made by Palari Labs. Version 1 is a private organizer —
+            So, When? is made by Palari Labs, Inc. Version 1 is a private organizer —
             not a social network.
           </Text>
-          <Text className="text-caption text-muted">Privacy policy coming with the Play listing.</Text>
         </Section>
       </ScrollView>
     </SafeAreaView>
@@ -266,12 +266,18 @@ function ChoiceChips<T extends number>({
           return (
             <Pressable
               key={String(option.value)}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
               onPress={() => onChange(option.value)}
-              className={`min-h-[44px] rounded-full border px-4 py-2 ${
+              className={`min-h-[44px] items-center justify-center rounded-full border px-4 ${
                 selected ? 'border-primary bg-primary-soft' : 'border-border bg-canvas'
               }`}
             >
-              <Text className={`font-sans-semibold text-caption ${selected ? 'text-primary' : 'text-ink'}`}>
+              <Text
+                className={`text-center font-sans-semibold text-caption leading-5 ${
+                  selected ? 'text-primary' : 'text-ink'
+                }`}
+              >
                 {option.label}
               </Text>
             </Pressable>
