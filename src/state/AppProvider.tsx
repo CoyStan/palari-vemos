@@ -63,7 +63,10 @@ import {
   startFreshStorage,
 } from "../persistence/storage";
 import { WriteQueue } from "../persistence/writeQueue";
-import { cancelAllReminders, rescheduleReminders } from "../services/reminders";
+import {
+  reminderCoordinator,
+  rescheduleReminders,
+} from "../services/reminders";
 import { clearOwnedMediaDirectory } from "../services/media";
 import { shareInviteMessage } from "../services/share";
 
@@ -86,6 +89,7 @@ export type ScreenId =
   | "planDetail"
   | "moveFriend"
   | "privacyPolicy"
+  | "pastPlans"
   | "recovery";
 
 export type { FriendInput, AvailabilityInput };
@@ -93,6 +97,9 @@ export type { FriendInput, AvailabilityInput };
 type AppContextValue = {
   ready: boolean;
   loadError: string | null;
+  /** Failed persistence op — Retry repeats this op, never resaves after wipe/startFresh. */
+  persistError: { op: "save" | "wipe" | "startFresh"; message: string } | null;
+  /** @deprecated alias of persistError?.message when op===save — prefer persistError */
   saveError: string | null;
   recoveryWarnings: string[];
   data: AppData;
@@ -120,6 +127,7 @@ type AppContextValue = {
   goSettings: () => void;
   goBack: () => void;
   openAddFriend: () => void;
+  openAddFriendForPlan: (slot: ConcreteSlot) => void;
   openEditFriend: (friendId: string) => void;
   openFriendProfile: (friendId: string) => void;
   openAddAvailability: () => void;
@@ -129,6 +137,7 @@ type AppContextValue = {
   openOnboarding: () => void;
   openCreatePlan: (slot: ConcreteSlot, friendIds?: string[]) => void;
   openPlanDetail: (planId: string) => void;
+  openPastPlans: () => void;
   toggleFriendSelection: (friendId: string) => void;
   saveFriend: (input: FriendInput, friendId?: string) => Promise<void>;
   deleteFriend: (friendId: string) => Promise<void>;
@@ -185,6 +194,7 @@ type AppContextValue = {
   wipeData: () => Promise<{ ok: boolean; message?: string }>;
   retryLoad: () => Promise<void>;
   retrySave: () => Promise<void>;
+  retryPersist: () => Promise<void>;
   startFresh: () => Promise<{ ok: boolean; message?: string }>;
   logCaughtUp: (friendId: string, whenIso: string) => Promise<void>;
   dismissRecoveryWarnings: () => void;
@@ -195,7 +205,12 @@ const AppContext = createContext<AppContextValue | null>(null);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [persistError, setPersistError] = useState<{
+    op: "save" | "wipe" | "startFresh";
+    message: string;
+  } | null>(null);
+  const saveError = persistError?.op === "save" ? persistError.message : null;
+  const addingFriendForPlanRef = useRef(false);
   const [recoveryWarnings, setRecoveryWarnings] = useState<string[]>([]);
   const [data, setData] = useState<AppData>(emptyAppData);
   const dataRef = useRef(data);
@@ -301,7 +316,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           await rescheduleReminders(next, revision);
         }
       });
-      setSaveError(writeQueue.error);
+      setPersistError(
+        writeQueue.error ? { op: "save", message: writeQueue.error } : null,
+      );
     },
     [writeQueue],
   );
@@ -352,13 +369,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const spotlightPlan = useMemo(() => {
     const todayKey = formatDateKey(now);
     return (
-      data.plans.find(
-        (plan) =>
-          plan.status !== "done" &&
-          plan.status !== "cancelled" &&
-          formatDateKey(new Date(plan.startAt)) === todayKey &&
-          new Date(plan.endAt).getTime() >= now.getTime(),
-      ) ?? null
+      data.plans
+        .filter(
+          (plan) =>
+            plan.status !== "done" &&
+            plan.status !== "cancelled" &&
+            formatDateKey(new Date(plan.startAt)) === todayKey &&
+            new Date(plan.endAt).getTime() >= now.getTime(),
+        )
+        .sort((a, b) => a.startAt.localeCompare(b.startAt))[0] ?? null
     );
   }, [data.plans, now]);
 
@@ -403,9 +422,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [resetTo]);
 
   const openAddFriend = useCallback(() => {
+    addingFriendForPlanRef.current = false;
     setActiveFriendId(null);
     push("addFriend");
   }, [push]);
+
+  const openAddFriendForPlan = useCallback(
+    (slot: ConcreteSlot) => {
+      const window = proposePlanWindow(
+        slot.startAt,
+        slot.endAt,
+        dataRef.current.settings.defaultDurationMinutes,
+      );
+      const proposed: ConcreteSlot = {
+        ...slot,
+        startAt: window.startAt,
+        endAt: window.endAt,
+        startMinutes:
+          new Date(window.startAt).getHours() * 60 +
+          new Date(window.startAt).getMinutes(),
+        endMinutes:
+          new Date(window.endAt).getHours() * 60 +
+          new Date(window.endAt).getMinutes(),
+      };
+      setSelectedSlot(proposed);
+      addingFriendForPlanRef.current = true;
+      setActiveFriendId(null);
+      push("addFriend");
+    },
+    [push],
+  );
 
   const openEditFriend = useCallback(
     (friendId: string) => {
@@ -472,6 +518,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [push],
   );
 
+  const openPastPlans = useCallback(() => push("pastPlans"), [push]);
+
   const toggleFriendSelection = useCallback((friendId: string) => {
     setSelectedFriendIds((current) =>
       current.includes(friendId)
@@ -483,8 +531,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const saveFriend = useCallback(
     async (input: FriendInput, friendId?: string) => {
       if (!input.name.trim()) return;
-      const fromCreatePlan =
-        stackRef.current.includes("createPlan") && selectedSlot;
+      const forPlan = addingFriendForPlanRef.current && selectedSlot;
       let createdId: string | null = null;
       const previousPhoto = friendId
         ? (dataRef.current.friends.find((friend) => friend.id === friendId)
@@ -506,7 +553,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       if (friendId) {
         setActiveFriendId(friendId);
-        // Prefer popping back to existing profile instead of stacking a duplicate.
         if (stackRef.current.includes("friendProfile")) {
           setStack((current) => {
             const profileIdx = current.lastIndexOf("friendProfile");
@@ -519,13 +565,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
         return;
       }
-      if (fromCreatePlan && createdId && selectedSlot) {
+      if (forPlan && createdId && selectedSlot) {
         setSelectedFriendIds((ids) =>
           ids.includes(createdId!) ? ids : [...ids, createdId!],
         );
-        goBack();
+        addingFriendForPlanRef.current = false;
+        replaceTop("createPlan");
         return;
       }
+      addingFriendForPlanRef.current = false;
       goBack();
     },
     [commit, goBack, replaceTop, selectedSlot, writeQueue],
@@ -804,15 +852,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const shareInvite = useCallback(
     async (friendId: string, message: string) => {
       if (activePlanId) {
-        await commit((current) =>
-          updateInvitationTextState(
+        await commit((current) => {
+          const plan = current.plans.find((item) => item.id === activePlanId);
+          const existing = plan?.friends.find(
+            (item) => item.friendId === friendId,
+          );
+          const customized =
+            Boolean(existing?.invitationCustomized) ||
+            (existing?.invitationText ?? "") !== message;
+          return updateInvitationTextState(
             current,
             activePlanId,
             friendId,
             message,
-            true,
-          ),
-        );
+            customized,
+          );
+        });
       }
       const friend = dataRef.current.friends.find(
         (item) => item.id === friendId,
@@ -928,15 +983,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const wipeData = useCallback(async () => {
     try {
       await writeQueue.runExclusive(async () => {
-        await cancelAllReminders();
-        await clearOwnedMediaDirectory();
+        await reminderCoordinator.resetAndCancel();
         await clearAppData();
+        await clearOwnedMediaDirectory();
       });
       const empty = emptyAppData();
       dataRef.current = empty;
       setData(empty);
       clearSelectionState();
-      setSaveError(null);
+      setPersistError(null);
       setRecoveryWarnings([]);
       resetTo("welcome");
       setTab("when");
@@ -944,7 +999,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Could not delete all data.";
-      setSaveError(message);
+      setPersistError({ op: "wipe", message });
       return { ok: false, message };
     }
   }, [clearSelectionState, resetTo, writeQueue]);
@@ -962,32 +1017,47 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await rescheduleReminders(snapshot, revision);
       }
     });
-    setSaveError(writeQueue.error);
+    setPersistError(
+      writeQueue.error ? { op: "save", message: writeQueue.error } : null,
+    );
   }, [writeQueue]);
 
   const startFresh = useCallback(async () => {
     try {
       await writeQueue.runExclusive(async () => {
-        await cancelAllReminders();
-        await clearOwnedMediaDirectory();
+        await reminderCoordinator.resetAndCancel();
         await startFreshStorage();
+        await clearOwnedMediaDirectory();
       });
       const empty = emptyAppData();
       dataRef.current = empty;
       setData(empty);
       clearSelectionState();
       setLoadError(null);
-      setSaveError(null);
+      setPersistError(null);
       setRecoveryWarnings([]);
       resetTo("welcome");
       return { ok: true };
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Could not start fresh.";
-      setSaveError(message);
+      setPersistError({ op: "startFresh", message });
       return { ok: false, message };
     }
   }, [clearSelectionState, resetTo, writeQueue]);
+
+  const retryPersist = useCallback(async () => {
+    if (!persistError) return;
+    if (persistError.op === "wipe") {
+      await wipeData();
+      return;
+    }
+    if (persistError.op === "startFresh") {
+      await startFresh();
+      return;
+    }
+    await retrySave();
+  }, [persistError, retrySave, startFresh, wipeData]);
 
   const dismissRecoveryWarnings = useCallback(() => {
     setRecoveryWarnings([]);
@@ -1009,6 +1079,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     () => ({
       ready,
       loadError,
+      persistError,
       saveError,
       recoveryWarnings,
       data,
@@ -1036,6 +1107,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       goSettings,
       goBack,
       openAddFriend,
+      openAddFriendForPlan,
       openEditFriend,
       openFriendProfile,
       openAddAvailability,
@@ -1045,6 +1117,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       openOnboarding,
       openCreatePlan,
       openPlanDetail,
+      openPastPlans,
       toggleFriendSelection,
       saveFriend,
       deleteFriend,
@@ -1074,6 +1147,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       wipeData,
       retryLoad: hydrate,
       retrySave,
+      retryPersist,
       startFresh,
       logCaughtUp,
       dismissRecoveryWarnings,
@@ -1081,6 +1155,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [
       ready,
       loadError,
+      persistError,
       saveError,
       recoveryWarnings,
       data,
@@ -1107,6 +1182,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       goSettings,
       goBack,
       openAddFriend,
+      openAddFriendForPlan,
       openEditFriend,
       openFriendProfile,
       openAddAvailability,
@@ -1116,6 +1192,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       openOnboarding,
       openCreatePlan,
       openPlanDetail,
+      openPastPlans,
       toggleFriendSelection,
       saveFriend,
       deleteFriend,
@@ -1144,6 +1221,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       wipeData,
       hydrate,
       retrySave,
+      retryPersist,
       startFresh,
       logCaughtUp,
       dismissRecoveryWarnings,
