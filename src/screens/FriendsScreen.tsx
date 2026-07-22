@@ -14,7 +14,7 @@ import { cn } from "../ui/cn";
 export function FriendsScreen() {
   const { data, openAddFriend, openFriendProfile, saveFriend } = useApp();
 
-  const onPickContact = async () => {
+  const onPickContact = () => {
     if (Platform.OS === "web") {
       Alert.alert(
         "Contacts",
@@ -23,36 +23,53 @@ export function FriendsScreen() {
       openAddFriend();
       return;
     }
-    try {
-      const picked = await pickOneContact();
-      if (!picked) {
-        return;
-      }
-      let photoUri: string | null = null;
-      if (picked.photoUri) {
-        const owned = await copyIntoOwnedMedia(picked.photoUri, "contact");
-        if (!owned.ok) {
-          Alert.alert("Photo not saved", owned.message);
-        } else {
-          photoUri = owned.uri;
-        }
-      }
-      await saveFriend({
-        name: picked.name,
-        photoUri,
-        phone: picked.phone,
-        shareMethod: "whatsapp",
-        rhythm: "monthly",
-        customDays: 45,
-        lastMetAt: null,
-      });
-    } catch {
-      Alert.alert(
-        "Could not open contacts",
-        "You can still add a friend manually.",
-      );
-      openAddFriend();
-    }
+    Alert.alert(
+      "Choose one contact",
+      "So, When? opens your contact picker to fill in a name and optional phone or photo for this friend only. Contacts are never scanned or uploaded.",
+      [
+        { text: "Add manually", onPress: openAddFriend },
+        {
+          text: "Continue",
+          onPress: () => {
+            void (async () => {
+              const result = await pickOneContact();
+              if (!result.ok) {
+                if (result.reason === "cancelled") {
+                  return;
+                }
+                Alert.alert("Contacts", result.message, [
+                  { text: "Add manually", onPress: openAddFriend },
+                  { text: "OK", style: "cancel" },
+                ]);
+                return;
+              }
+              let photoUri: string | null = null;
+              if (result.contact.photoUri) {
+                const owned = await copyIntoOwnedMedia(
+                  result.contact.photoUri,
+                  "contact",
+                );
+                if (!owned.ok) {
+                  Alert.alert("Photo not saved", owned.message);
+                } else {
+                  photoUri = owned.uri;
+                }
+              }
+              await saveFriend({
+                name: result.contact.name,
+                photoUri,
+                phone: result.contact.phone,
+                shareMethod: "whatsapp",
+                rhythm: "monthly",
+                customDays: 45,
+                lastMetAt: null,
+              });
+            })();
+          },
+        },
+        { text: "Cancel", style: "cancel" },
+      ],
+    );
   };
 
   const onAddFriend = () => {
@@ -61,7 +78,7 @@ export function FriendsScreen() {
       "We only copy the one contact you pick. Everything stays on your phone.",
       [
         { text: "Add manually", onPress: openAddFriend },
-        { text: "Choose from contacts", onPress: () => void onPickContact() },
+        { text: "Choose from contacts", onPress: () => onPickContact() },
         { text: "Cancel", style: "cancel" },
       ],
     );

@@ -100,19 +100,21 @@ export function WhenCalendar({
   };
 
   // Land near "now" so the grid feels oriented when opening Week/Day.
+  // Intentionally omit `now` / nowMinutes so the minute tick does not re-scroll.
   useEffect(() => {
     if (gridWidth <= 0) {
       return;
     }
+    const minutes = now.getHours() * 60 + now.getMinutes();
     const offset = Math.max(
       0,
-      ((nowMinutes - startHour * 60) / 60) * HOUR_HEIGHT - HOUR_HEIGHT * 1.5,
+      ((minutes - startHour * 60) / 60) * HOUR_HEIGHT - HOUR_HEIGHT * 1.5,
     );
     const timer = setTimeout(() => {
       scrollRef.current?.scrollTo({ y: offset, animated: false });
     }, 40);
     return () => clearTimeout(timer);
-  }, [gridWidth, mode, focusKey, startHour, nowMinutes]);
+  }, [gridWidth, mode, focusKey, startHour]);
 
   return (
     <View
@@ -329,6 +331,8 @@ function FreeBlockView({
 }) {
   const top = ((slot.startMinutes - dayStartHour * 60) / 60) * HOUR_HEIGHT;
   const height = ((slot.endMinutes - slot.startMinutes) / 60) * HOUR_HEIGHT;
+  const visualHeight = Math.max(height - 3, 1);
+  const hitPad = Math.max(0, Math.ceil((44 - visualHeight) / 2));
 
   return (
     <Pressable
@@ -360,10 +364,15 @@ function FreeBlockView({
       onPress={onPress}
       onLongPress={onLongPress}
       delayLongPress={420}
+      hitSlop={
+        hitPad > 0
+          ? { top: hitPad, bottom: hitPad, left: 4, right: 4 }
+          : undefined
+      }
       className="absolute z-[1] rounded-[10px] border border-dashed border-primary-softBorder bg-primary-soft px-1.5 py-1"
       style={{
         top,
-        height: Math.max(height - 3, 44),
+        height: visualHeight,
         width: Math.max(dayWidth - 4, 12),
         left: 2,
         opacity: booked ? 0.4 : 1,
@@ -406,6 +415,8 @@ function PlanBlockView({
   const height =
     ((Math.max(endMinutes, startMinutes + 30) - startMinutes) / 60) *
     HOUR_HEIGHT;
+  const visualHeight = Math.max(height - 3, 1);
+  const hitPad = Math.max(0, Math.ceil((44 - visualHeight) / 2));
   const chip = PLAN_CHIP[plan.status];
 
   return (
@@ -413,10 +424,15 @@ function PlanBlockView({
       accessibilityRole="button"
       accessibilityLabel={`${label}, ${PLAN_STATUS_LABELS[plan.status]}`}
       onPress={onPress}
+      hitSlop={
+        hitPad > 0
+          ? { top: hitPad, bottom: hitPad, left: 4, right: 4 }
+          : undefined
+      }
       className="absolute z-[2] rounded-[10px] border px-1.5 py-1"
       style={{
         top,
-        height: Math.max(height - 3, 44),
+        height: visualHeight,
         width: Math.max(dayWidth - 4, 12),
         left: 2,
         backgroundColor: chip.bg,

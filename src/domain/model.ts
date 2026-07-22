@@ -254,15 +254,6 @@ export function buildInviteText(input: {
   return `Hey ${name} — I’m free ${when}. Want to catch up?`;
 }
 
-/** Alpha: no generic insight claims about life outside So, When?. */
-export function buildInsight(
-  _friends: Friend[],
-  _plans: Plan[],
-  _now = new Date(),
-): string | null {
-  return null;
-}
-
 export function formatPlanWhen(
   iso: string,
   timeFormat24h: boolean,
@@ -335,6 +326,48 @@ export function proposePlanWindow(
     startAt: new Date(startMs).toISOString(),
     endAt: new Date(Math.max(startMs + 30 * 60_000, endMs)).toISOString(),
   };
+}
+
+/** Build a ConcreteSlot that is not tied to an availability rule. */
+export function makeOneOffSlot(
+  startAt: string | Date,
+  endAt: string | Date,
+  label = "One-off",
+): ConcreteSlot {
+  const start = typeof startAt === "string" ? new Date(startAt) : startAt;
+  const end = typeof endAt === "string" ? new Date(endAt) : endAt;
+  const startMinutes = start.getHours() * 60 + start.getMinutes();
+  const endMinutes = end.getHours() * 60 + end.getMinutes();
+  return {
+    key: `oneoff:${start.toISOString()}`,
+    ruleId: null,
+    date: formatDateKey(start),
+    startMinutes,
+    endMinutes,
+    startAt: start.toISOString(),
+    endAt: end.toISOString(),
+    label,
+  };
+}
+
+/**
+ * Default when for a direct “Make a plan” — tomorrow evening, local time.
+ * Availability remains optional suggestions, not a gate.
+ */
+export function defaultOneOffPlanSlot(
+  now = new Date(),
+  durationMinutes = 60,
+): ConcreteSlot {
+  const start = new Date(now);
+  start.setDate(start.getDate() + 1);
+  start.setHours(18, 0, 0, 0);
+  if (start.getTime() <= now.getTime()) {
+    start.setDate(start.getDate() + 1);
+  }
+  const end = new Date(
+    start.getTime() + Math.max(30, durationMinutes) * 60_000,
+  );
+  return makeOneOffSlot(start, end);
 }
 
 export function slotConflictsWithPlans(

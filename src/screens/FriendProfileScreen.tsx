@@ -34,6 +34,7 @@ export function FriendProfileScreen() {
     openEditFriend,
     openPlanDetail,
     openCreatePlan,
+    openMakePlan,
     openAddAvailability,
     logCaughtUp,
     goBack,
@@ -180,41 +181,47 @@ export function FriendProfileScreen() {
         <Text className="font-sans-bold text-section text-ink">
           Make a plan with {friend.name}
         </Text>
+        <Button
+          label={`Plan with ${friend.name}`}
+          onPress={() => {
+            hapticTick();
+            openMakePlan([friend.id]);
+          }}
+        />
         {suggestions.length > 0 ? (
-          suggestions.map((slot) => (
-            <PressableScale
-              key={slot.key}
-              accessibilityRole="button"
-              accessibilityLabel={`Plan with ${friend.name} on ${formatDayHeading(new Date(slot.startAt))}`}
-              onPress={() => onPickSuggestion(slot)}
-            >
-              <View className="rounded-card bg-primary-soft p-4">
-                <Text className="font-sans-semibold text-caption text-primary">
-                  {formatDayHeading(new Date(slot.startAt))}
-                </Text>
-                <Text className="mt-1 font-sans-bold text-section text-ink">
-                  {formatClock(slot.startMinutes, data.settings.timeFormat24h)}
-                  {" – "}
-                  {formatClock(slot.endMinutes, data.settings.timeFormat24h)}
-                </Text>
-                <Text className="mt-1 text-body text-primary">
-                  Tap to plan with {friend.name}
-                </Text>
-              </View>
-            </PressableScale>
-          ))
-        ) : (
-          <Card className="gap-3 p-4">
-            <Text className="text-body text-muted">
-              No free windows yet. Add when you’re usually free, then come back
-              to pick a time with {friend.name}.
+          <>
+            <Text className="text-caption text-muted">
+              Or use a free window:
             </Text>
-            <Button
-              label="Add free time"
-              variant="secondary"
-              onPress={openAddAvailability}
-            />
-          </Card>
+            {suggestions.map((slot) => (
+              <PressableScale
+                key={slot.key}
+                accessibilityRole="button"
+                accessibilityLabel={`Plan with ${friend.name} on ${formatDayHeading(new Date(slot.startAt))}`}
+                onPress={() => onPickSuggestion(slot)}
+              >
+                <View className="rounded-card bg-primary-soft p-4">
+                  <Text className="font-sans-semibold text-caption text-primary">
+                    {formatDayHeading(new Date(slot.startAt))}
+                  </Text>
+                  <Text className="mt-1 font-sans-bold text-section text-ink">
+                    {formatClock(
+                      slot.startMinutes,
+                      data.settings.timeFormat24h,
+                    )}
+                    {" – "}
+                    {formatClock(slot.endMinutes, data.settings.timeFormat24h)}
+                  </Text>
+                </View>
+              </PressableScale>
+            ))}
+          </>
+        ) : (
+          <Button
+            label="Add free time (optional)"
+            variant="ghost"
+            onPress={openAddAvailability}
+          />
         )}
       </View>
 

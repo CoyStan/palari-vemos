@@ -1,8 +1,17 @@
-import { Alert, Pressable, ScrollView, Switch, Text, View } from "react-native";
+import {
+  Alert,
+  Linking,
+  Pressable,
+  ScrollView,
+  Switch,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { feedbackMailtoUrl, FEEDBACK_EMAIL } from "../content/feedback";
 import { color } from "../foundation";
 import { ensureNotificationPermission } from "../services/reminders";
 import { useApp } from "../state/AppProvider";
@@ -166,6 +175,7 @@ export function SettingsScreen() {
         <Section title="Catch-up reminders">
           <ToggleRow
             label="Catch-up nudge"
+            hint="Quiet weekly nudges for a few weeks, rotating who is due"
             value={settings.notifyCatchUpDue}
             onValueChange={(value) => toggle("notifyCatchUpDue", value)}
             disabled={!settings.notificationsEnabled}
@@ -197,6 +207,18 @@ export function SettingsScreen() {
             So, When? is made by Palari Labs, Inc. Version 1 is a private
             organizer — not a social network.
           </Text>
+          <Button
+            label="Send feedback"
+            variant="secondary"
+            onPress={() => {
+              void Linking.openURL(feedbackMailtoUrl()).catch(() => {
+                Alert.alert(
+                  "Couldn’t open mail",
+                  `Email us at ${FEEDBACK_EMAIL}`,
+                );
+              });
+            }}
+          />
         </Section>
 
         <Section title="Advanced">

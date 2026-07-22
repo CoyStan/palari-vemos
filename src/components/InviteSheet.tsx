@@ -78,7 +78,7 @@ export function InviteSheet({ slot, onClose, onMakePlan }: Props) {
                 variant="secondary"
                 onPress={() => {
                   onClose();
-                  openAddFriendForPlan(slot);
+                  openAddFriendForPlan(slot, selectedIds, "inviteSheet");
                 }}
               />
             </View>
@@ -145,7 +145,7 @@ export function InviteSheet({ slot, onClose, onMakePlan }: Props) {
                 variant="ghost"
                 onPress={() => {
                   onClose();
-                  openAddFriendForPlan(slot);
+                  openAddFriendForPlan(slot, selectedIds, "inviteSheet");
                 }}
               />
               <Button

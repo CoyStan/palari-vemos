@@ -325,7 +325,7 @@ export function createPlanState(
     return {
       ok: false,
       reason: "conflict",
-      message: "That time was just taken. Pick another free slot.",
+      message: "That time was just taken. Pick another time.",
     };
   }
 

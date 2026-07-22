@@ -92,3 +92,13 @@ export async function rescheduleReminders(
   if (Platform.OS === "web") return;
   await reminderCoordinator.schedule(data, revision);
 }
+
+/** Foreground: always reconcile even if data revision is unchanged. */
+export async function reconcileRemindersOnForeground(
+  data: AppData,
+  revision?: number,
+): Promise<void> {
+  if (Platform.OS === "web") return;
+  if (reminderCoordinator.isResetting) return;
+  await reminderCoordinator.reconcile(data, revision);
+}
