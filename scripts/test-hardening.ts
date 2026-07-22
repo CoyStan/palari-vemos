@@ -3,6 +3,9 @@
  * Run via npm test.
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   markInviteSentState,
@@ -821,10 +824,13 @@ async function main() {
         ...emptyAppData().settings,
         notificationsEnabled: true,
         notifyPlanTomorrow: true,
+        notifyAskIfHappened: false,
+        notifyCatchUpDue: false,
       },
       plans: [
         basePlan({
           id: "p1",
+          status: "on",
           startAt: new Date(2026, 6, 24, 19, 0).toISOString(),
           endAt: new Date(2026, 6, 24, 20, 0).toISOString(),
         }),
@@ -837,15 +843,42 @@ async function main() {
     await coord.schedule(enabled, 1);
     assert.equal(io.scheduled.length, firstCount); // same revision: no duplicates
 
-    io.holdNextCancel = true;
-    io.gate = deferred<void>();
-    const stale = coord.schedule(enabled, 2);
+    // Wipe barrier with explicit deferred phases (not a single Promise.resolve).
+    const barrierPhase = deferred<void>();
+    const drainPhase = deferred<void>();
+    const scheduleCallsDuringBarrier: number[] = [];
+    const originalSchedule = io.schedule.bind(io);
+    io.schedule = async (input) => {
+      if (coord.isResetting) {
+        scheduleCallsDuringBarrier.push(Date.now());
+      }
+      return originalSchedule(input);
+    };
+    io.cancelGate = deferred<void>();
+    const racing = coord.schedule(enabled, 2);
     await Promise.resolve();
-    const resetP = coord.resetAndCancel();
-    io.gate.resolve();
+    const resetP = coord.resetAndCancel({
+      afterBarrierRaised: async () => {
+        assert.equal(coord.isResetting, true);
+        await coord.schedule(enabled, 99);
+        assert.equal(coord.isResetting, true);
+        barrierPhase.resolve();
+      },
+      afterDrain: async () => {
+        assert.equal(coord.isResetting, true);
+        await coord.reconcile(enabled, 100);
+        assert.equal(coord.isResetting, true);
+        drainPhase.resolve();
+      },
+    });
+    await barrierPhase.promise;
+    io.cancelGate.resolve();
+    await drainPhase.promise;
     await resetP;
-    await stale;
+    await racing;
+    assert.equal(scheduleCallsDuringBarrier.length, 0);
     assert.equal(io.scheduled.length, 0);
+    assert.equal(coord.isResetting, false);
 
     // Older revision cannot overwrite newer after a fresh schedule
     const io2 = createFakeReminderIo();
@@ -855,6 +888,212 @@ async function main() {
     assert.ok(mid >= 1);
     await coord2.schedule(enabled, 3); // older
     assert.equal(io2.scheduled.length, mid);
+  }
+
+  // --- reminder foreground reconcile (same revision) ---
+  {
+    const io = createFakeReminderIo(new Date(2026, 6, 21, 10, 0, 0));
+    const coord = new ReminderCoordinator(io);
+    const catchUpData: AppData = {
+      ...emptyAppData(),
+      settings: {
+        ...emptyAppData().settings,
+        notificationsEnabled: true,
+        notifyPlanTomorrow: false,
+        notifyAskIfHappened: false,
+        notifyCatchUpDue: true,
+        showReminderNames: true,
+      },
+      friends: [
+        friend({
+          id: "a",
+          name: "Ana",
+          lastMetAt: "2020-01-01T12:00:00.000Z",
+          rhythm: "weekly",
+        }),
+      ],
+    };
+
+    await coord.schedule(catchUpData, 1);
+    assert.ok(io.scheduled.length >= 1);
+    const firstTrigger = io.scheduled[0]!.triggerAt.getTime();
+    // Simulate OS consuming the one-shot notification.
+    io.scheduled = [];
+    // Advance past today's quiet hour so a replacement (tomorrow) is planned.
+    io.nowDate = new Date(2026, 6, 21, 12, 0, 0);
+    await coord.reconcile(catchUpData, 1);
+    assert.ok(io.scheduled.length >= 1);
+    assert.ok(io.scheduled[0]!.triggerAt.getTime() > firstTrigger);
+
+    // Permission denied → granted without a data mutation / revision bump.
+    io.permissionGranted = false;
+    io.scheduled = [];
+    await coord.schedule(catchUpData, 1);
+    assert.equal(io.scheduled.length, 0);
+    io.permissionGranted = true;
+    await coord.reconcile(catchUpData, 1);
+    assert.ok(io.scheduled.length >= 1);
+  }
+
+  // --- reminder API error vs persistence ---
+  {
+    const io = createFakeReminderIo();
+    const boom = new Error("notification service down");
+    io.schedule = async () => {
+      throw boom;
+    };
+    const coord = new ReminderCoordinator(io);
+    const enabled = {
+      ...emptyAppData(),
+      settings: {
+        ...emptyAppData().settings,
+        notificationsEnabled: true,
+        notifyPlanTomorrow: true,
+        notifyAskIfHappened: false,
+        notifyCatchUpDue: false,
+      },
+      plans: [
+        basePlan({
+          id: "p1",
+          status: "on",
+          startAt: new Date(2026, 6, 24, 19, 0).toISOString(),
+          endAt: new Date(2026, 6, 24, 20, 0).toISOString(),
+        }),
+      ],
+    };
+    await coord.schedule(enabled, 1);
+    assert.equal(coord.error, "notification service down");
+  }
+
+  // --- invitation draft / share integrity ---
+  {
+    const {
+      visibleInvitationText,
+      invitationDraftIsDirty,
+      invitationCustomizedAfterShare,
+      navigationAfterAddFriendForPlan,
+      calendarBlockVisualHeight,
+      calendarBlockHitPad,
+    } = await import("../src/domain/invitationUi");
+    const { buildInviteText } = await import("../src/domain/model");
+
+    assert.equal(
+      visibleInvitationText("persisted", false, "stale-draft"),
+      "persisted",
+    );
+    assert.equal(
+      visibleInvitationText("persisted", true, "local-draft"),
+      "local-draft",
+    );
+    assert.equal(invitationDraftIsDirty(true, "edited", "persisted"), true);
+    assert.equal(invitationDraftIsDirty(true, "persisted", "persisted"), false);
+
+    const warm = buildInviteText({
+      name: "Ana",
+      startAt: new Date(2026, 6, 22, 18, 0).toISOString(),
+      endAt: new Date(2026, 6, 22, 19, 0).toISOString(),
+      activity: "Coffee",
+      place: "Cafe",
+      timeFormat24h: false,
+      tone: "warm",
+    });
+    const casual = buildInviteText({
+      name: "Ana",
+      startAt: new Date(2026, 6, 22, 18, 0).toISOString(),
+      endAt: new Date(2026, 6, 22, 19, 0).toISOString(),
+      activity: "Coffee",
+      place: "Cafe",
+      timeFormat24h: false,
+      tone: "casual",
+    });
+    assert.notEqual(warm, casual);
+
+    assert.equal(
+      invitationCustomizedAfterShare(
+        { invitationText: warm, invitationCustomized: false },
+        warm,
+      ),
+      false,
+    );
+    assert.equal(
+      invitationCustomizedAfterShare(
+        { invitationText: warm, invitationCustomized: false },
+        casual,
+      ),
+      true,
+    );
+
+    // Non-custom invitations regenerate when time/activity/place change.
+    let data: AppData = {
+      ...emptyAppData(),
+      friends: [friend({ id: "a", name: "Ana" })],
+      plans: [
+        basePlan({
+          id: "p1",
+          activity: "Coffee",
+          place: "Cafe",
+          startAt: new Date(2026, 6, 22, 18, 0).toISOString(),
+          endAt: new Date(2026, 6, 22, 19, 0).toISOString(),
+          friends: [
+            {
+              ...planFriend("a", "not_invited"),
+              invitationText: warm,
+              invitationCustomized: false,
+              inviteTone: "warm",
+            },
+          ],
+        }),
+      ],
+    };
+    const regenerated = buildInviteText({
+      name: "Ana",
+      startAt: data.plans[0]!.startAt,
+      endAt: data.plans[0]!.endAt,
+      activity: "Walk",
+      place: "Park",
+      timeFormat24h: false,
+      tone: "warm",
+    });
+    data = {
+      ...data,
+      plans: data.plans.map((plan) => ({
+        ...plan,
+        activity: "Walk",
+        place: "Park",
+        friends: plan.friends.map((item) =>
+          item.invitationCustomized
+            ? item
+            : { ...item, invitationText: regenerated },
+        ),
+      })),
+    };
+    assert.equal(data.plans[0]?.friends[0]?.invitationText, regenerated);
+    assert.equal(data.plans[0]?.friends[0]?.invitationCustomized, false);
+
+    assert.equal(navigationAfterAddFriendForPlan("createPlan"), "goBack");
+    assert.equal(
+      navigationAfterAddFriendForPlan("inviteSheet"),
+      "replaceCreatePlan",
+    );
+
+    // 30-minute block keeps real geometry; hitSlop covers 44pt target.
+    const visual = calendarBlockVisualHeight(30, 56);
+    const pad = calendarBlockHitPad(visual);
+    assert.equal(visual, 25);
+    assert.equal(pad, 10);
+    assert.ok(visual + pad * 2 >= 44);
+  }
+
+  // --- EAS CLI pin consistency ---
+  {
+    const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+    const eas = JSON.parse(readFileSync(join(root, "eas.json"), "utf8")) as {
+      cli: { version: string };
+    };
+    const play = readFileSync(join(root, "docs/PLAY_RELEASE.md"), "utf8");
+    assert.ok(eas.cli.version.includes("16.32.0"));
+    assert.ok(play.includes("eas-cli@16.32.0"));
+    assert.ok(play.includes(eas.cli.version));
   }
 
   console.log("hardening tests: ok");

@@ -63,12 +63,16 @@ import {
   startFreshStorage,
 } from "../persistence/storage";
 import { WriteQueue } from "../persistence/writeQueue";
+import { invitationCustomizedAfterShare } from "../domain/invitationUi";
 import {
+  reconcileRemindersOnForeground,
   reminderCoordinator,
   rescheduleReminders,
 } from "../services/reminders";
 import { clearOwnedMediaDirectory } from "../services/media";
 import { shareInviteMessage } from "../services/share";
+
+export type AddFriendForPlanOrigin = "inviteSheet" | "createPlan";
 
 export type TabId = "when" | "friends" | "settings";
 export type WhenMode = "list" | "week" | "day";
@@ -101,6 +105,9 @@ type AppContextValue = {
   persistError: { op: "save" | "wipe" | "startFresh"; message: string } | null;
   /** @deprecated alias of persistError?.message when op===save — prefer persistError */
   saveError: string | null;
+  /** Reminder API failures — separate from persistence. */
+  reminderError: string | null;
+  dismissReminderError: () => void;
   recoveryWarnings: string[];
   data: AppData;
   now: Date;
@@ -127,7 +134,11 @@ type AppContextValue = {
   goSettings: () => void;
   goBack: () => void;
   openAddFriend: () => void;
-  openAddFriendForPlan: (slot: ConcreteSlot) => void;
+  openAddFriendForPlan: (
+    slot: ConcreteSlot,
+    friendIds: string[],
+    origin: AddFriendForPlanOrigin,
+  ) => void;
   openEditFriend: (friendId: string) => void;
   openFriendProfile: (friendId: string) => void;
   openAddAvailability: () => void;
@@ -210,7 +221,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     message: string;
   } | null>(null);
   const saveError = persistError?.op === "save" ? persistError.message : null;
-  const addingFriendForPlanRef = useRef(false);
+  const [reminderError, setReminderError] = useState<string | null>(null);
+  const addingFriendForPlanRef = useRef<AddFriendForPlanOrigin | null>(null);
   const [recoveryWarnings, setRecoveryWarnings] = useState<string[]>([]);
   const [data, setData] = useState<AppData>(emptyAppData);
   const dataRef = useRef(data);
@@ -273,11 +285,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => sub.remove();
   }, [goBack]);
 
+  const syncReminderError = useCallback(() => {
+    setReminderError(reminderCoordinator.error);
+  }, []);
+
   useEffect(() => {
     const sub = AppState.addEventListener("change", (state) => {
       if (state === "active") {
         setNowTick(Date.now());
-        void rescheduleReminders(dataRef.current, revisionRef.current);
+        if (reminderCoordinator.isResetting) return;
+        void reconcileRemindersOnForeground(
+          dataRef.current,
+          revisionRef.current,
+        ).then(syncReminderError);
       }
     });
     const midnight = setInterval(() => setNowTick(Date.now()), 60_000);
@@ -285,7 +305,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       sub.remove();
       clearInterval(midnight);
     };
-  }, []);
+  }, [syncReminderError]);
 
   const clearSelectionState = useCallback(() => {
     setSelectedSlot(null);
@@ -314,6 +334,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         // Latest-snapshot-wins: only schedule if this revision is still current.
         if (revision === revisionRef.current) {
           await rescheduleReminders(next, revision);
+          setReminderError(reminderCoordinator.error);
         }
       });
       setPersistError(
@@ -341,7 +362,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setTab("when");
       setReady(true);
       revisionRef.current += 1;
-      void rescheduleReminders(loaded.data, revisionRef.current);
+      void rescheduleReminders(loaded.data, revisionRef.current).then(
+        syncReminderError,
+      );
       const referenced = [
         ...loaded.data.friends.map((friend) => friend.photoUri),
         ...loaded.data.plans.map((plan) => plan.memoryPhotoUri),
@@ -354,11 +377,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setReady(true);
       resetTo("recovery");
     }
-  }, [resetTo]);
+  }, [resetTo, syncReminderError]);
 
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
+
+  const dismissReminderError = useCallback(() => {
+    setReminderError(null);
+  }, []);
 
   const slots = useMemo(
     () =>
@@ -422,13 +449,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [resetTo]);
 
   const openAddFriend = useCallback(() => {
-    addingFriendForPlanRef.current = false;
+    addingFriendForPlanRef.current = null;
     setActiveFriendId(null);
     push("addFriend");
   }, [push]);
 
   const openAddFriendForPlan = useCallback(
-    (slot: ConcreteSlot) => {
+    (
+      slot: ConcreteSlot,
+      friendIds: string[],
+      origin: AddFriendForPlanOrigin,
+    ) => {
       const window = proposePlanWindow(
         slot.startAt,
         slot.endAt,
@@ -446,7 +477,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           new Date(window.endAt).getMinutes(),
       };
       setSelectedSlot(proposed);
-      addingFriendForPlanRef.current = true;
+      setSelectedFriendIds(friendIds);
+      addingFriendForPlanRef.current = origin;
       setActiveFriendId(null);
       push("addFriend");
     },
@@ -566,14 +598,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (forPlan && createdId && selectedSlot) {
+        const origin = addingFriendForPlanRef.current;
         setSelectedFriendIds((ids) =>
           ids.includes(createdId!) ? ids : [...ids, createdId!],
         );
-        addingFriendForPlanRef.current = false;
-        replaceTop("createPlan");
+        addingFriendForPlanRef.current = null;
+        if (origin === "createPlan") {
+          goBack();
+        } else {
+          // From InviteSheet: enter CreatePlan exactly once.
+          replaceTop("createPlan");
+        }
         return;
       }
-      addingFriendForPlanRef.current = false;
+      addingFriendForPlanRef.current = null;
       goBack();
     },
     [commit, goBack, replaceTop, selectedSlot, writeQueue],
@@ -851,15 +889,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const shareInvite = useCallback(
     async (friendId: string, message: string) => {
+      // Persist the exact visible text; do not mark unchanged generated text custom.
       if (activePlanId) {
         await commit((current) => {
           const plan = current.plans.find((item) => item.id === activePlanId);
           const existing = plan?.friends.find(
             (item) => item.friendId === friendId,
           );
-          const customized =
-            Boolean(existing?.invitationCustomized) ||
-            (existing?.invitationText ?? "") !== message;
+          const customized = invitationCustomizedAfterShare(existing, message);
           return updateInvitationTextState(
             current,
             activePlanId,
@@ -983,15 +1020,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const wipeData = useCallback(async () => {
     try {
       await writeQueue.runExclusive(async () => {
-        await reminderCoordinator.resetAndCancel();
-        await clearAppData();
-        await clearOwnedMediaDirectory();
+        await reminderCoordinator.resetAndCancel({
+          afterBarrierRaised: async () => {
+            await clearAppData();
+            await clearOwnedMediaDirectory();
+          },
+        });
       });
       const empty = emptyAppData();
       dataRef.current = empty;
       setData(empty);
       clearSelectionState();
       setPersistError(null);
+      setReminderError(null);
       setRecoveryWarnings([]);
       resetTo("welcome");
       setTab("when");
@@ -1015,6 +1056,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return;
       if (revision === revisionRef.current) {
         await rescheduleReminders(snapshot, revision);
+        setReminderError(reminderCoordinator.error);
       }
     });
     setPersistError(
@@ -1025,9 +1067,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const startFresh = useCallback(async () => {
     try {
       await writeQueue.runExclusive(async () => {
-        await reminderCoordinator.resetAndCancel();
-        await startFreshStorage();
-        await clearOwnedMediaDirectory();
+        await reminderCoordinator.resetAndCancel({
+          afterBarrierRaised: async () => {
+            await startFreshStorage();
+            await clearOwnedMediaDirectory();
+          },
+        });
       });
       const empty = emptyAppData();
       dataRef.current = empty;
@@ -1035,6 +1080,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       clearSelectionState();
       setLoadError(null);
       setPersistError(null);
+      setReminderError(null);
       setRecoveryWarnings([]);
       resetTo("welcome");
       return { ok: true };
@@ -1081,6 +1127,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       loadError,
       persistError,
       saveError,
+      reminderError,
+      dismissReminderError,
       recoveryWarnings,
       data,
       now,
@@ -1157,6 +1205,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       loadError,
       persistError,
       saveError,
+      reminderError,
+      dismissReminderError,
       recoveryWarnings,
       data,
       now,

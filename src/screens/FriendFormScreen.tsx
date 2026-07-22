@@ -72,32 +72,50 @@ export function FriendFormScreen({ mode }: Props) {
 
   const onPickContact = async () => {
     if (Platform.OS === "web") {
-      Alert.alert("Contacts", "Contact picking works on Android and iOS.");
+      Alert.alert(
+        "Contacts",
+        "Contact picking works on Android and iOS. You can still type a name.",
+      );
       return;
     }
-    setPicking(true);
-    try {
-      const picked = await pickOneContact();
-      if (!picked) {
-        return;
-      }
-      setName(picked.name);
-      setPhone(picked.phone);
-      if (picked.photoUri) {
-        const owned = await ownPhoto(picked.photoUri, "contact");
-        if (owned) {
-          setPhotoUri(owned);
-        }
-        // Keep existing photo if contact has none or copy fails.
-      }
-    } catch {
-      Alert.alert(
-        "Could not open contacts",
-        "You can still add a friend by typing a name.",
-      );
-    } finally {
-      setPicking(false);
-    }
+    Alert.alert(
+      "Choose one contact",
+      "So, When? opens your contact picker to fill in a name and optional phone or photo for this friend only. Contacts are never scanned or uploaded.",
+      [
+        { text: "Type instead", style: "cancel" },
+        {
+          text: "Continue",
+          onPress: () => {
+            void (async () => {
+              setPicking(true);
+              try {
+                const result = await pickOneContact();
+                if (!result.ok) {
+                  if (result.reason === "cancelled") {
+                    return;
+                  }
+                  Alert.alert("Contacts", result.message);
+                  return;
+                }
+                setName(result.contact.name);
+                setPhone(result.contact.phone);
+                if (result.contact.photoUri) {
+                  const owned = await ownPhoto(
+                    result.contact.photoUri,
+                    "contact",
+                  );
+                  if (owned) {
+                    setPhotoUri(owned);
+                  }
+                }
+              } finally {
+                setPicking(false);
+              }
+            })();
+          },
+        },
+      ],
+    );
   };
 
   const onPickPhoto = async () => {

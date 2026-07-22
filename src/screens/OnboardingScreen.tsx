@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Alert, Platform, Pressable, Text, View } from "react-native";
 
 import { Button } from "../components/Button";
 import { Screen } from "../components/Screen";
@@ -97,17 +97,47 @@ export function OnboardingScreen() {
     return formatDateKey(d);
   }, []);
 
-  const onPickContact = async () => {
-    const contact = await pickOneContact();
-    if (!contact) return;
-    setName(contact.name);
-    setPhone(contact.phone ?? "");
-    if (contact.photoUri) {
-      const owned = await copyIntoOwnedMedia(contact.photoUri, "contact");
-      if (owned.ok) {
-        setPhotoUri(owned.uri);
-      }
+  const onPickContact = () => {
+    if (Platform.OS === "web") {
+      Alert.alert(
+        "Contacts",
+        "Contact picking works on Android and iOS. You can still type a name.",
+      );
+      return;
     }
+    Alert.alert(
+      "Choose one contact",
+      "So, When? opens your contact picker to fill in a name and optional phone or photo for this friend only. Contacts are never scanned or uploaded. You can always type a name instead.",
+      [
+        { text: "Type instead", style: "cancel" },
+        {
+          text: "Continue",
+          onPress: () => {
+            void (async () => {
+              const result = await pickOneContact();
+              if (!result.ok) {
+                if (result.reason === "cancelled") {
+                  return;
+                }
+                Alert.alert("Contacts", result.message);
+                return;
+              }
+              setName(result.contact.name);
+              setPhone(result.contact.phone ?? "");
+              if (result.contact.photoUri) {
+                const owned = await copyIntoOwnedMedia(
+                  result.contact.photoUri,
+                  "contact",
+                );
+                if (owned.ok) {
+                  setPhotoUri(owned.uri);
+                }
+              }
+            })();
+          },
+        },
+      ],
+    );
   };
 
   const finish = async (availability: AvailabilityInput | null) => {
@@ -160,7 +190,7 @@ export function OnboardingScreen() {
         <Button
           label="Choose one contact"
           variant="secondary"
-          onPress={() => void onPickContact()}
+          onPress={() => onPickContact()}
         />
         <TextField
           label="Friend’s name"
@@ -170,6 +200,9 @@ export function OnboardingScreen() {
           accessibilityLabel="Friend’s name"
           accessibilityHint="Type a name if you prefer not to use contacts"
         />
+        <Text className="text-caption text-muted">
+          Prefer typing? Use the name field — contacts are optional.
+        </Text>
         <Button
           label="Continue"
           disabled={!name.trim()}

@@ -13,17 +13,31 @@ export type ReminderIo = {
   now: () => Date;
 };
 
+export type ScheduleOptions = {
+  /**
+   * Force a full reschedule even if this revision already ran.
+   * Used on AppState foreground so consumed one-shots can be replaced.
+   */
+  reconcile?: boolean;
+};
+
 /**
- * Serialized reminder scheduling. Latest revision wins; wipe generation
- * invalidates in-flight work so stale jobs cannot cancel or schedule after reset.
+ * Serialized reminder scheduling with a wipe/startFresh barrier.
+ * Same-revision calls coalesce while queued/in-flight, but reconcile
+ * always runs a fresh pass after the barrier is clear.
  */
 export class ReminderCoordinator {
   private chain: Promise<void> = Promise.resolve();
   private generation = 0;
   private revision = 0;
-  private lastScheduledRevision: number | null = null;
+  /** Revision currently queued or running (coalesce key). */
+  private pendingRevision: number | null = null;
+  /** Last revision that completed a successful schedule (non-reconcile skip). */
+  private lastSuccessfulRevision: number | null = null;
   private inFlight = 0;
+  private resetting = false;
   private scheduledIds: string[] = [];
+  private lastError: string | null = null;
 
   constructor(private readonly io: ReminderIo) {}
 
@@ -35,18 +49,43 @@ export class ReminderCoordinator {
     return this.revision;
   }
 
+  get isResetting(): boolean {
+    return this.resetting;
+  }
+
+  get error(): string | null {
+    return this.lastError;
+  }
+
   /** Invalidate pending/in-flight schedule work (does not cancel OS reminders yet). */
   invalidate(): void {
     this.generation += 1;
-    this.lastScheduledRevision = null;
+    this.pendingRevision = null;
+    this.lastSuccessfulRevision = null;
+  }
+
+  /** Enter wipe/startFresh barrier — schedule/reconcile become no-ops. */
+  beginReset(): void {
+    this.resetting = true;
+    this.invalidate();
   }
 
   /**
-   * Queue a reschedule. Older revisions no-op. Same revision after a successful
-   * schedule does not create duplicates.
+   * Queue a reschedule. Older revisions no-op.
+   * Without reconcile, coalesces duplicate same-revision work while pending.
+   * With reconcile, always enqueues a fresh pass (after barrier clears).
    */
-  schedule(data: AppData, revision?: number): Promise<void> {
+  schedule(
+    data: AppData,
+    revision?: number,
+    options?: ScheduleOptions,
+  ): Promise<void> {
+    if (this.resetting) {
+      return Promise.resolve();
+    }
+
     const genAtEnqueue = this.generation;
+    const reconcile = options?.reconcile === true;
     let targetRevision = this.revision;
     if (typeof revision === "number") {
       if (revision < this.revision) {
@@ -56,41 +95,68 @@ export class ReminderCoordinator {
       targetRevision = revision;
     }
 
+    if (
+      !reconcile &&
+      this.lastSuccessfulRevision === targetRevision &&
+      this.pendingRevision !== targetRevision
+    ) {
+      return Promise.resolve();
+    }
+
+    if (!reconcile && this.pendingRevision === targetRevision) {
+      return this.chain;
+    }
+
+    this.pendingRevision = targetRevision;
+
     const run = async () => {
-      if (genAtEnqueue !== this.generation) return;
-      if (targetRevision < this.revision) return;
-      if (this.lastScheduledRevision === targetRevision) return;
+      if (this.resetting || genAtEnqueue !== this.generation) {
+        if (this.pendingRevision === targetRevision) {
+          this.pendingRevision = null;
+        }
+        return;
+      }
+      if (targetRevision < this.revision) {
+        if (this.pendingRevision === targetRevision) {
+          this.pendingRevision = null;
+        }
+        return;
+      }
 
       this.inFlight += 1;
       try {
         if (!data.settings.notificationsEnabled) {
-          if (genAtEnqueue !== this.generation) return;
+          if (this.resetting || genAtEnqueue !== this.generation) return;
           await this.io.cancelAll();
           this.scheduledIds = [];
-          if (genAtEnqueue === this.generation) {
-            this.lastScheduledRevision = targetRevision;
+          this.lastError = null;
+          if (genAtEnqueue === this.generation && !this.resetting) {
+            this.lastSuccessfulRevision = targetRevision;
           }
           return;
         }
 
         const granted = await this.io.ensurePermission();
-        if (genAtEnqueue !== this.generation) return;
+        if (this.resetting || genAtEnqueue !== this.generation) return;
         if (targetRevision < this.revision) return;
         if (!granted) {
           await this.io.cancelAll();
           this.scheduledIds = [];
-          this.lastScheduledRevision = targetRevision;
+          this.lastError = null;
+          if (genAtEnqueue === this.generation && !this.resetting) {
+            this.lastSuccessfulRevision = targetRevision;
+          }
           return;
         }
 
         await this.io.cancelAll();
-        if (genAtEnqueue !== this.generation) return;
+        if (this.resetting || genAtEnqueue !== this.generation) return;
         if (targetRevision < this.revision) return;
 
         const specs = buildReminderSpecs(data, this.io.now());
         const ids: string[] = [];
         for (const spec of specs) {
-          if (genAtEnqueue !== this.generation) return;
+          if (this.resetting || genAtEnqueue !== this.generation) return;
           const id = await this.io.schedule({
             title: spec.title,
             body: spec.body,
@@ -98,11 +164,22 @@ export class ReminderCoordinator {
           });
           ids.push(id);
         }
-        if (genAtEnqueue !== this.generation) return;
+        if (this.resetting || genAtEnqueue !== this.generation) return;
         this.scheduledIds = ids;
-        this.lastScheduledRevision = targetRevision;
+        this.lastError = null;
+        this.lastSuccessfulRevision = targetRevision;
+      } catch (error) {
+        if (!this.resetting && genAtEnqueue === this.generation) {
+          this.lastError =
+            error instanceof Error
+              ? error.message
+              : "Could not update reminders.";
+        }
       } finally {
         this.inFlight -= 1;
+        if (this.pendingRevision === targetRevision) {
+          this.pendingRevision = null;
+        }
       }
     };
 
@@ -110,22 +187,41 @@ export class ReminderCoordinator {
     return this.chain;
   }
 
+  /** Foreground reconciliation — must run even if revision is unchanged. */
+  reconcile(data: AppData, revision?: number): Promise<void> {
+    return this.schedule(data, revision, { reconcile: true });
+  }
+
   /**
-   * For wipe/startFresh: invalidate, drain in-flight schedule work, then cancel OS reminders.
+   * Wipe/startFresh: raise barrier, drain in-flight work, cancel OS reminders,
+   * then clear the barrier. Optional phase hooks for deterministic tests.
    */
-  async resetAndCancel(): Promise<void> {
-    this.invalidate();
+  async resetAndCancel(phases?: {
+    afterBarrierRaised?: () => Promise<void>;
+    afterDrain?: () => Promise<void>;
+  }): Promise<void> {
+    this.beginReset();
+    if (phases?.afterBarrierRaised) {
+      await phases.afterBarrierRaised();
+    }
     await this.chain.catch(() => undefined);
     while (this.inFlight > 0) {
       await Promise.resolve();
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
-    await this.io.cancelAll();
-    this.scheduledIds = [];
-    this.lastScheduledRevision = null;
+    if (phases?.afterDrain) {
+      await phases.afterDrain();
+    }
+    try {
+      await this.io.cancelAll();
+      this.scheduledIds = [];
+      this.lastError = null;
+      this.lastSuccessfulRevision = null;
+    } finally {
+      this.resetting = false;
+    }
   }
 
-  /** Test helper: ids scheduled by the last successful run. */
   getScheduledIdsForTests(): string[] {
     return [...this.scheduledIds];
   }
@@ -139,17 +235,20 @@ export type FakeReminderIo = ReminderIo & {
     triggerAt: Date;
     id: string;
   }>;
-  gate: ReturnType<typeof deferred<void>>;
-  holdNextCancel: boolean;
+  permissionGranted: boolean;
+  nowDate: Date;
+  cancelGate: ReturnType<typeof deferred<void>> | null;
 };
 
 /** Build a coordinator with deferred fake IO for tests. */
-export function createFakeReminderIo(): FakeReminderIo {
-  const gateBox = { current: deferred<void>() };
-  gateBox.current.resolve();
+export function createFakeReminderIo(
+  initialNow = new Date("2026-07-21T12:00:00.000Z"),
+): FakeReminderIo {
   let cancelled = 0;
   let scheduled: FakeReminderIo["scheduled"] = [];
-  let holdNextCancel = false;
+  let permissionGranted = true;
+  let nowDate = initialNow;
+  let cancelGate: ReturnType<typeof deferred<void>> | null = null;
   let seq = 0;
 
   const io: FakeReminderIo = {
@@ -165,21 +264,27 @@ export function createFakeReminderIo(): FakeReminderIo {
     set scheduled(value) {
       scheduled = value;
     },
-    get holdNextCancel() {
-      return holdNextCancel;
+    get permissionGranted() {
+      return permissionGranted;
     },
-    set holdNextCancel(value: boolean) {
-      holdNextCancel = value;
+    set permissionGranted(value: boolean) {
+      permissionGranted = value;
     },
-    get gate() {
-      return gateBox.current;
+    get nowDate() {
+      return nowDate;
     },
-    set gate(value) {
-      gateBox.current = value;
+    set nowDate(value: Date) {
+      nowDate = value;
+    },
+    get cancelGate() {
+      return cancelGate;
+    },
+    set cancelGate(value) {
+      cancelGate = value;
     },
     cancelAll: async () => {
-      if (holdNextCancel) {
-        await gateBox.current.promise;
+      if (cancelGate) {
+        await cancelGate.promise;
       }
       cancelled += 1;
       scheduled = [];
@@ -189,8 +294,8 @@ export function createFakeReminderIo(): FakeReminderIo {
       scheduled.push({ ...input, id });
       return id;
     },
-    ensurePermission: async () => true,
-    now: () => new Date("2026-07-21T12:00:00.000Z"),
+    ensurePermission: async () => permissionGranted,
+    now: () => nowDate,
   };
   return io;
 }

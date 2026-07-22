@@ -118,7 +118,13 @@ export function CreatePlanScreen() {
               </Text>
               <Button
                 label="Add a friend"
-                onPress={() => openAddFriendForPlan(selectedSlot)}
+                onPress={() =>
+                  openAddFriendForPlan(
+                    selectedSlot,
+                    selectedFriendIds,
+                    "createPlan",
+                  )
+                }
               />
             </Card>
           ) : (
@@ -126,7 +132,13 @@ export function CreatePlanScreen() {
               <Button
                 label="Add someone new"
                 variant="ghost"
-                onPress={() => openAddFriendForPlan(selectedSlot)}
+                onPress={() =>
+                  openAddFriendForPlan(
+                    selectedSlot,
+                    selectedFriendIds,
+                    "createPlan",
+                  )
+                }
               />
               {sortedFriends.map((friend) => {
                 const selected = selectedFriendIds.includes(friend.id);

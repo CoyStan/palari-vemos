@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "So, When?",
-    "slug": "vemos",
+    "slug": "so-when",
     "version": "0.1.0",
     "scheme": "sowhen",
     "orientation": "portrait",
@@ -17,7 +17,10 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": [],
+      "permissions": [
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS"
+      ],
       "blockedPermissions": [
         "android.permission.WRITE_CONTACTS",
         "android.permission.CAMERA",
@@ -41,7 +44,10 @@
     },
     "extra": {
       "product": "so-when",
-      "organization": "Palari Labs, Inc."
+      "organization": "Palari Labs, Inc.",
+      "eas": {
+        "projectId": "511080a9-ef93-40b2-8948-8e84de2cadd5"
+      }
     },
     "plugins": [
       "expo-font",
@@ -75,6 +81,7 @@
         }
       ],
       "expo-sharing"
-    ]
+    ],
+    "owner": "palari.io"
   }
 }
