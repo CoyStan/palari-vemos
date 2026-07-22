@@ -8,7 +8,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "android": {
-      "package": "com.palarilabs.vemos",
+      "package": "com.sowhen.myapp",
       "allowBackup": false,
       "adaptiveIcon": {
         "backgroundColor": "#FAF8F5",
@@ -32,7 +32,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.palarilabs.vemos",
+      "bundleIdentifier": "com.sowhen.myapp",
       "infoPlist": {
         "NSContactsUsageDescription": "So, When? only copies the single contact you choose. Your address book is never scanned or uploaded.",
         "NSPhotoLibraryUsageDescription": "Add an optional photo for a friend you want to see."

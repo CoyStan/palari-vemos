@@ -7,7 +7,7 @@ Fill these forms from the **final AAB**, not from this checklist alone.
 | Field | Value |
 | --- | --- |
 | App name | So, When? |
-| Package | `com.palarilabs.vemos` (keep until owner confirms whether Play already has a build; otherwise consider `io.palari.sowhen`) |
+| Package | `com.sowhen.myapp` (must match Google Play Console) |
 | Publisher | Palari Labs, Inc. |
 | Privacy policy URL | Host `docs/PRIVACY_POLICY.md` / `docs/privacy-policy.html` at HTTPS |
 

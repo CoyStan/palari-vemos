@@ -1,4 +1,5 @@
-import { useEffect, type ReactNode } from "react";
+import { useLayoutEffect, type ReactNode } from "react";
+import { View } from "react-native";
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -22,7 +23,7 @@ type Props = {
   screenKey: string;
   children: ReactNode;
   /**
-   * none — tabs / reset (instant)
+   * none — no wrapper animation (prefer not wrapping tabs at all)
    * push — forward into a detail (from right)
    * pop — back (from left)
    * replace — same depth swap (fade only)
@@ -31,11 +32,8 @@ type Props = {
 };
 
 /**
- * Navigation enter motion following common mobile practice:
- * - Tab peers: none
- * - Push/pop: short horizontal shared-axis + fade
- * - Replace: fade only
- * Reduce-motion → instant.
+ * Stack enter motion only. Tab roots must not use this — wrap them in a plain View.
+ * Reduce-motion → instant. Opacity never applies when motion is none.
  */
 export function ScreenTransition({
   screenKey,
@@ -44,10 +42,12 @@ export function ScreenTransition({
 }: Props) {
   const reduceMotion = useReduceMotion();
   const progress = useSharedValue(1);
-  const slideSign = useSharedValue(1);
+  const slideSign = useSharedValue(0);
+  const skipMotion = motion === "none" || reduceMotion;
 
-  useEffect(() => {
-    if (motion === "none" || reduceMotion) {
+  // useLayoutEffect: reset before paint so we never flash a mid-animation frame.
+  useLayoutEffect(() => {
+    if (skipMotion) {
       slideSign.value = 0;
       progress.value = 1;
       return;
@@ -62,7 +62,7 @@ export function ScreenTransition({
       duration,
       easing: Easing.out(Easing.cubic),
     });
-  }, [screenKey, motion, reduceMotion, progress, slideSign]);
+  }, [screenKey, motion, skipMotion, progress, slideSign]);
 
   const animatedStyle = useAnimatedStyle(() => {
     const sign = slideSign.value;
@@ -76,8 +76,12 @@ export function ScreenTransition({
     };
   });
 
+  if (skipMotion) {
+    return <View style={{ flex: 1, overflow: "hidden" }}>{children}</View>;
+  }
+
   return (
-    <Animated.View style={[{ flex: 1 }, animatedStyle]}>
+    <Animated.View style={[{ flex: 1, overflow: "hidden" }, animatedStyle]}>
       {children}
     </Animated.View>
   );

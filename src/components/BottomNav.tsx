@@ -3,7 +3,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { color, shadowSoft } from "../foundation";
 import type { TabId } from "../state/AppProvider";
-import { cn } from "../ui/cn";
 import { Icon } from "./Icon";
 
 type Props = {
@@ -17,10 +16,13 @@ export function BottomNav({ active, onWhen, onFriends, onSettings }: Props) {
   const insets = useSafeAreaInsets();
   return (
     <View
-      className="px-4 pt-2"
+      className="bg-canvas px-4 pt-2"
       style={{ paddingBottom: Math.max(insets.bottom, 12) }}
     >
-      <View className="flex-row rounded-full bg-surface p-2" style={shadowSoft}>
+      <View
+        className="flex-row rounded-full bg-surface p-2"
+        style={[{ overflow: "hidden" }, shadowSoft]}
+      >
         <NavItem
           label="When"
           icon="calendar"
@@ -62,20 +64,31 @@ function NavItem({
       accessibilityState={{ selected: active }}
       accessibilityLabel={label}
       onPress={onPress}
-      className="flex-1"
+      android_ripple={{ color: "transparent" }}
+      style={{ flex: 1 }}
     >
       <View
-        className={cn(
-          "min-h-[52px] items-center justify-center gap-1 rounded-full px-2",
-          active && "bg-primary-soft",
-        )}
+        style={{
+          minHeight: 52,
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 4,
+          borderRadius: 999,
+          paddingHorizontal: 8,
+          // Solid style (not className swap) avoids a one-frame NativeWind flash.
+          backgroundColor: active ? color.softTeal : "transparent",
+          overflow: "hidden",
+        }}
       >
         <Icon name={icon} size={22} color={tint} />
         <Text
-          className={cn(
-            "text-center text-caption font-sans-semibold leading-4",
-            active ? "text-primary" : "text-muted",
-          )}
+          style={{
+            textAlign: "center",
+            fontSize: 12,
+            lineHeight: 16,
+            fontFamily: "Quicksand_600SemiBold",
+            color: tint,
+          }}
         >
           {label}
         </Text>

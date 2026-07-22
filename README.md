@@ -33,4 +33,4 @@ Prefer NativeWind `className` for UI. Keep brand colors in sync between `tailwin
 
 ## Release
 
-Google Play / EAS notes: [docs/PLAY_RELEASE.md](docs/PLAY_RELEASE.md). Package id: `com.palarilabs.vemos` (legacy). Publisher: Palari Labs, Inc.
+Google Play / EAS notes: [docs/PLAY_RELEASE.md](docs/PLAY_RELEASE.md). Package id: `com.sowhen.myapp` (Play Console). Publisher: Palari Labs, Inc.
