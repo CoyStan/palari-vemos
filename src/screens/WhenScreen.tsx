@@ -12,7 +12,6 @@ import { PressableScale } from "../components/PressableScale";
 import { RecoveryWarningsBanner } from "../components/RecoveryWarningsBanner";
 import { WhenCalendar } from "../components/WhenCalendar";
 import {
-  buildInsight,
   expandAvailability,
   formatClock,
   INVITE_STATUS_LABELS,
@@ -30,11 +29,32 @@ import {
   startOfWeek,
   weekDates,
 } from "../domain/time";
-import type { ConcreteSlot } from "../domain/types";
+import type { ConcreteSlot, Plan, PlanStatus } from "../domain/types";
 import { color, shadowSoft } from "../foundation";
 import { hapticTick } from "../services/haptics";
 import { useApp } from "../state/AppProvider";
 import { cn } from "../ui/cn";
+
+const LIST_STATUS_CHIP: Record<
+  PlanStatus,
+  { bg: string; fg: string; border: string }
+> = {
+  draft: { bg: color.softCoral, fg: color.coralDeep, border: "#F5C4B8" },
+  waiting: { bg: color.softTeal, fg: color.primary, border: "#B7E0DD" },
+  on: { bg: "#ECFDF3", fg: color.success, border: "#A7F3C0" },
+  needs_time: { bg: color.softCoral, fg: color.coralDeep, border: "#F5C4B8" },
+  done: { bg: color.canvas, fg: color.muted, border: color.border },
+  cancelled: { bg: color.canvas, fg: color.muted, border: color.border },
+};
+
+const QUICK_PLAN_STATUSES: PlanStatus[] = [
+  "draft",
+  "waiting",
+  "on",
+  "needs_time",
+  "done",
+  "cancelled",
+];
 
 function greeting(): string {
   const hour = new Date().getHours();
@@ -52,15 +72,16 @@ export function WhenScreen() {
     spotlightPlan: todaySpotlight,
     openAddAvailability,
     openCreatePlan,
+    openMakePlan,
     openPlanDetail,
     openPastPlans,
     openAddFriend,
-    openFriendProfile,
     skipOccurrence,
     whenMode: mode,
     setWhenMode: setMode,
     whenFocusDate: focusDate,
     setWhenFocusDate: setFocusDate,
+    markPlanStatus,
   } = useApp();
 
   const firstDay = data.settings.firstDayOfWeek;
@@ -69,6 +90,7 @@ export function WhenScreen() {
   );
   const [sheetSlot, setSheetSlot] = useState<ConcreteSlot | null>(null);
   const [skipSlot, setSkipSlot] = useState<ConcreteSlot | null>(null);
+  const [statusPlan, setStatusPlan] = useState<Plan | null>(null);
 
   useEffect(() => {
     setWeekStart(startOfWeek(focusDate, firstDay));
@@ -157,11 +179,6 @@ export function WhenScreen() {
     setSkipSlot(null);
   };
 
-  const insight = useMemo(
-    () => buildInsight(data.friends, data.plans),
-    [data.friends, data.plans],
-  );
-
   const spotlightNames = todaySpotlight
     ? todaySpotlight.friends
         .filter((item) => item.status === "yes")
@@ -203,18 +220,28 @@ export function WhenScreen() {
               {greeting()} · {mode === "list" ? "the next few weeks" : title}
             </Text>
           </View>
-          <PressableScale
-            accessibilityRole="button"
-            accessibilityLabel="Add free time"
-            onPress={openAddAvailability}
-            className="min-h-12 flex-row items-center justify-center gap-1.5 rounded-full bg-primary px-4"
-            style={shadowSoft}
-          >
-            <Icon name="plus" size={20} color="#FFFFFF" />
-            <Text className="font-sans-semibold text-caption text-white">
-              Free time
-            </Text>
-          </PressableScale>
+          <View className="flex-row items-center gap-2">
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel="Add free time"
+              onPress={openAddAvailability}
+              className="min-h-12 items-center justify-center rounded-full bg-surface px-3"
+              style={shadowSoft}
+            >
+              <Icon name="plus" size={20} color={color.ink} />
+            </PressableScale>
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel="Make a plan"
+              onPress={() => openMakePlan()}
+              className="min-h-12 flex-row items-center justify-center gap-1.5 rounded-full bg-primary px-4"
+              style={shadowSoft}
+            >
+              <Text className="font-sans-semibold text-caption text-white">
+                Make a plan
+              </Text>
+            </PressableScale>
+          </View>
         </View>
 
         <RecoveryWarningsBanner />
@@ -282,15 +309,6 @@ export function WhenScreen() {
           })}
         </View>
 
-        {insight && mode === "list" ? (
-          <View className="mb-3 flex-row items-start gap-2 rounded-control bg-surface/80 px-3 py-2.5">
-            <Icon name="sun" size={14} color={color.primary} />
-            <Text className="flex-1 text-caption text-muted italic">
-              {insight}
-            </Text>
-          </View>
-        ) : null}
-
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Past plans"
@@ -348,7 +366,7 @@ export function WhenScreen() {
               Start with someone you miss
             </Text>
             <Text className="text-body text-muted">
-              Add a friend first — then mark when you’re free and invite them.
+              Add a friend, then make a plan whenever it feels right.
             </Text>
             <Button label="Add a friend" onPress={openAddFriend} />
           </Card>
@@ -357,32 +375,36 @@ export function WhenScreen() {
         {data.friends.length > 0 &&
         data.availability.length === 0 &&
         mode === "list" ? (
-          <Card className="gap-3">
+          <Card className="mb-3 gap-3">
             <Text className="font-sans-bold text-section text-ink">
-              Mark when you’re free
+              Make a plan anytime
             </Text>
             <Text className="text-body text-muted">
-              Even an hour helps. Add free time, then tap a slot to plan with
-              someone.
+              You don’t need free-time rules first. Pick someone and a day —
+              optional free time only adds suggestions here later.
             </Text>
-            <Button label="Add free time" onPress={openAddAvailability} />
+            <Button label="Make a plan" onPress={() => openMakePlan()} />
+            <Button
+              label="Add free time (optional)"
+              variant="ghost"
+              onPress={openAddAvailability}
+            />
           </Card>
         ) : null}
 
         {mode === "list" ? (
           <ScrollView
             className="flex-1"
-            contentContainerClassName="gap-3 pb-6"
+            contentContainerClassName="gap-2 pb-6"
             showsVerticalScrollIndicator={false}
           >
-            {timeline.length === 0 &&
-            data.friends.length > 0 &&
-            data.availability.length > 0 ? (
+            {timeline.length === 0 && data.friends.length > 0 ? (
               <Card className="gap-3">
                 <Text className="text-body text-muted">
-                  Nothing open in the next three weeks yet. Add free time — even
-                  an hour counts.
+                  No suggestions in the next few weeks yet. Make a plan anytime,
+                  or add free time so soft prompts can appear here.
                 </Text>
+                <Button label="Make a plan" onPress={() => openMakePlan()} />
                 <Button
                   label="Add free time"
                   variant="secondary"
@@ -397,8 +419,8 @@ export function WhenScreen() {
                   <PressableScale
                     key={`catch-${item.friend.id}`}
                     accessibilityRole="button"
-                    accessibilityLabel={`${item.friend.name}, catch-up suggestion`}
-                    onPress={() => openFriendProfile(item.friend.id)}
+                    accessibilityLabel={`Want to invite ${item.friend.name}? Make a plan`}
+                    onPress={() => openMakePlan([item.friend.id])}
                   >
                     <View className="flex-row items-center gap-3 rounded-card bg-coral-soft p-4">
                       <Avatar
@@ -411,7 +433,7 @@ export function WhenScreen() {
                           Want to invite {item.friend.name}?
                         </Text>
                         <Text className="text-caption text-coral-deep">
-                          {lastMetLabel(item.friend.lastMetAt)}
+                          {lastMetLabel(item.friend.lastMetAt)} · tap to plan
                         </Text>
                       </View>
                       <Icon
@@ -448,17 +470,23 @@ export function WhenScreen() {
               if (item.type === "availability") {
                 const start = new Date(item.slot.startAt);
                 return (
-                  <View key={item.slot.key} className="gap-2">
+                  <View
+                    key={item.slot.key}
+                    className="min-h-[44px] flex-row items-center gap-1"
+                  >
                     <PressableScale
                       accessibilityRole="button"
-                      accessibilityLabel={`Free ${formatDayHeading(start)}, tap to make a plan`}
+                      accessibilityLabel={`Free ${formatDayHeading(start)} ${formatClock(item.slot.startMinutes, data.settings.timeFormat24h)} to ${formatClock(item.slot.endMinutes, data.settings.timeFormat24h)}, tap to make a plan`}
                       onPress={() => openProposedSlot(item.slot)}
+                      className="min-w-0 flex-1"
                     >
-                      <View className="rounded-card bg-primary-soft p-4">
-                        <Text className="font-sans-semibold text-caption text-primary">
+                      <View className="min-h-[44px] flex-row items-center gap-2 rounded-control border border-dashed border-primary-softBorder bg-primary-soft px-3 py-2">
+                        <Text
+                          className="min-w-0 flex-1 font-sans-semibold text-caption text-ink"
+                          numberOfLines={1}
+                        >
                           {formatDayHeading(start)}
-                        </Text>
-                        <Text className="mt-1 font-sans-bold text-section text-ink">
+                          {" · "}
                           {formatClock(
                             item.slot.startMinutes,
                             data.settings.timeFormat24h,
@@ -469,8 +497,8 @@ export function WhenScreen() {
                             data.settings.timeFormat24h,
                           )}
                         </Text>
-                        <Text className="mt-1 text-body text-primary">
-                          You’re free — tap to plan something
+                        <Text className="font-sans-bold text-caption text-primary">
+                          Free
                         </Text>
                       </View>
                     </PressableScale>
@@ -479,10 +507,11 @@ export function WhenScreen() {
                         accessibilityRole="button"
                         accessibilityLabel={`Skip free time on ${formatDayHeading(start)}`}
                         onPress={() => onRequestSkip(item.slot)}
-                        className="min-h-[44px] items-center justify-center self-start px-2"
+                        className="min-h-[44px] min-w-[44px] items-center justify-center px-1"
+                        hitSlop={4}
                       >
                         <Text className="font-sans-semibold text-caption text-muted">
-                          Skip this one
+                          Skip
                         </Text>
                       </Pressable>
                     ) : null}
@@ -512,39 +541,84 @@ export function WhenScreen() {
                 )
                 .filter(Boolean)
                 .join(", ");
+              const chip = LIST_STATUS_CHIP[plan.status];
+              const isTerminal =
+                plan.status === "done" || plan.status === "cancelled";
 
               return (
-                <PressableScale
+                <View
                   key={plan.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${plan.title}, ${PLAN_STATUS_LABELS[plan.status]}`}
-                  onPress={() => openPlanDetail(plan.id)}
+                  className="flex-row items-stretch gap-2 rounded-card bg-surface p-3"
+                  style={shadowSoft}
                 >
-                  <Card elevation="lift" className="p-4">
-                    <Text className="font-sans-semibold text-caption text-muted">
-                      {formatDayHeading(start)} ·{" "}
-                      {formatClock(startMin, data.settings.timeFormat24h)}
-                      {" – "}
-                      {formatClock(endMin, data.settings.timeFormat24h)}
-                    </Text>
-                    <Text className="mt-1 font-sans-bold text-section text-ink">
-                      {plan.title}
-                    </Text>
-                    {names ? (
-                      <Text className="mt-1 text-body text-muted">
-                        {plan.activity
-                          ? `${plan.activity} with ${names}`
-                          : names}
+                  <PressableScale
+                    accessibilityRole="button"
+                    accessibilityLabel={`${plan.title}, ${PLAN_STATUS_LABELS[plan.status]}`}
+                    onPress={() => openPlanDetail(plan.id)}
+                    className="min-w-0 flex-1"
+                  >
+                    <View className="gap-0.5">
+                      <Text className="font-sans-semibold text-caption text-muted">
+                        {formatDayHeading(start)} ·{" "}
+                        {formatClock(startMin, data.settings.timeFormat24h)}
+                        {" – "}
+                        {formatClock(endMin, data.settings.timeFormat24h)}
                       </Text>
-                    ) : null}
-                    <Text className="mt-2 text-caption font-sans-semibold text-primary">
+                      <Text
+                        className="font-sans-bold text-body text-ink"
+                        numberOfLines={2}
+                      >
+                        {plan.title}
+                      </Text>
+                      {names ? (
+                        <Text
+                          className="text-caption text-muted"
+                          numberOfLines={1}
+                        >
+                          {plan.activity
+                            ? `${plan.activity} with ${names}`
+                            : names}
+                          {yes || waiting
+                            ? ` · ${yes} yes · ${waiting} waiting`
+                            : ""}
+                        </Text>
+                      ) : (
+                        <Text className="text-caption text-muted">
+                          {INVITE_STATUS_LABELS.not_invited}
+                        </Text>
+                      )}
+                    </View>
+                  </PressableScale>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Plan status ${PLAN_STATUS_LABELS[plan.status]}. Change status`}
+                    accessibilityHint={
+                      isTerminal
+                        ? undefined
+                        : "Opens choices to update this plan’s status"
+                    }
+                    disabled={isTerminal}
+                    onPress={() => {
+                      hapticTick();
+                      setStatusPlan(plan);
+                    }}
+                    className="min-h-[44px] min-w-[76px] max-w-[112px] items-center justify-center self-center rounded-full border px-2.5 py-2"
+                    style={{
+                      backgroundColor: chip.bg,
+                      borderColor: chip.border,
+                      opacity: isTerminal ? 0.7 : 1,
+                    }}
+                    hitSlop={6}
+                  >
+                    <Text
+                      className="text-center text-[11px] font-sans-bold leading-4"
+                      style={{ color: chip.fg }}
+                      numberOfLines={2}
+                    >
                       {PLAN_STATUS_LABELS[plan.status]}
-                      {yes || waiting
-                        ? ` · ${yes} confirmed · ${waiting} waiting`
-                        : ` · ${INVITE_STATUS_LABELS.not_invited}`}
                     </Text>
-                  </Card>
-                </PressableScale>
+                  </Pressable>
+                </View>
               );
             })}
           </ScrollView>
@@ -552,7 +626,7 @@ export function WhenScreen() {
           <View className="flex-1 gap-2">
             <Text className="text-caption text-muted">
               {data.availability.length === 0
-                ? "Tap Free time to mark when you’re open, then tap a slot to plan."
+                ? "Make a plan anytime, or add free time for suggestions on the calendar."
                 : "Tap a free slot to plan · use Skip on a slot · tap a plan to open"}
             </Text>
             <WhenCalendar
@@ -602,6 +676,59 @@ export function WhenScreen() {
             variant="ghost"
             onPress={() => setSkipSlot(null)}
           />
+        </View>
+      </AnimatedDialog>
+
+      <AnimatedDialog
+        visible={statusPlan !== null}
+        onClose={() => setStatusPlan(null)}
+        accessibilityLabel="Change plan status"
+      >
+        <View className="gap-3 px-5 pb-4">
+          <Text className="font-sans-bold text-section text-ink">
+            Update status
+          </Text>
+          <Text className="text-body text-muted" numberOfLines={2}>
+            {statusPlan?.title ?? "Plan"}
+          </Text>
+          <View className="gap-2">
+            {QUICK_PLAN_STATUSES.map((status) => {
+              const selected = statusPlan?.status === status;
+              const chip = LIST_STATUS_CHIP[status];
+              return (
+                <Pressable
+                  key={status}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={PLAN_STATUS_LABELS[status]}
+                  onPress={() => {
+                    if (!statusPlan) return;
+                    hapticTick();
+                    const planId = statusPlan.id;
+                    setStatusPlan(null);
+                    void markPlanStatus(status, planId);
+                  }}
+                  className={cn(
+                    "min-h-[48px] flex-row items-center justify-between rounded-control border px-4",
+                    selected ? "border-primary" : "border-border",
+                  )}
+                  style={{
+                    backgroundColor: selected ? chip.bg : color.surface,
+                  }}
+                >
+                  <Text
+                    className="font-sans-semibold text-body"
+                    style={{ color: selected ? chip.fg : color.ink }}
+                  >
+                    {PLAN_STATUS_LABELS[status]}
+                  </Text>
+                  {selected ? (
+                    <Icon name="check" size={18} color={chip.fg} />
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
       </AnimatedDialog>
     </SafeAreaView>

@@ -37,7 +37,9 @@ import {
 import {
   buildInviteText,
   buildTimeline,
+  defaultOneOffPlanSlot,
   expandAvailability,
+  makeOneOffSlot,
   proposePlanWindow,
   sortFriendsForPicker,
 } from "../domain/model";
@@ -76,6 +78,7 @@ export type AddFriendForPlanOrigin = "inviteSheet" | "createPlan";
 
 export type TabId = "when" | "friends" | "settings";
 export type WhenMode = "list" | "week" | "day";
+export type NavMotion = "none" | "push" | "pop" | "replace";
 export type ScreenId =
   | "loading"
   | "welcome"
@@ -113,6 +116,8 @@ type AppContextValue = {
   now: Date;
   screen: ScreenId;
   tab: TabId;
+  /** How the current screen was reached — drives ScreenTransition. */
+  navMotion: NavMotion;
   selectedSlot: ConcreteSlot | null;
   selectedFriendIds: string[];
   activePlanId: string | null;
@@ -147,6 +152,10 @@ type AppContextValue = {
   openPrivacyPolicy: () => void;
   openOnboarding: () => void;
   openCreatePlan: (slot: ConcreteSlot, friendIds?: string[]) => void;
+  /** Direct path — synthesizes a one-off when; availability is optional. */
+  openMakePlan: (friendIds?: string[]) => void;
+  /** Update the selected plan window (Create Plan date/time editors). */
+  setSelectedPlanWindow: (startAt: string, endAt: string) => void;
   openPlanDetail: (planId: string) => void;
   openPastPlans: () => void;
   toggleFriendSelection: (friendId: string) => void;
@@ -195,7 +204,8 @@ type AppContextValue = {
   shareInvite: (friendId: string, message: string) => Promise<boolean>;
   confirmInviteSent: (friendId: string, sent: boolean) => Promise<void>;
   markPlanDone: (attendedFriendIds: string[]) => Promise<void>;
-  markPlanStatus: (status: PlanStatus) => Promise<void>;
+  /** Optional planId for When list chips; defaults to activePlanId. */
+  markPlanStatus: (status: PlanStatus, planId?: string) => Promise<void>;
   openMoveFriend: (friendId: string) => void;
   moveFriendToSlot: (
     slot: ConcreteSlot,
@@ -232,6 +242,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [stack, setStack] = useState<ScreenId[]>(["loading"]);
   const stackRef = useRef(stack);
   stackRef.current = stack;
+  const [navMotion, setNavMotion] = useState<NavMotion>("none");
   const [tab, setTab] = useState<TabId>("when");
   const [selectedSlot, setSelectedSlot] = useState<ConcreteSlot | null>(null);
   const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
@@ -259,19 +270,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const screen: ScreenId = stack[stack.length - 1] ?? "loading";
 
-  const resetTo = useCallback((next: ScreenId) => setStack([next]), []);
-  const push = useCallback(
-    (next: ScreenId) => setStack((current) => [...current, next]),
-    [],
-  );
-  const replaceTop = useCallback(
-    (next: ScreenId) => setStack((current) => [...current.slice(0, -1), next]),
-    [],
-  );
+  const resetTo = useCallback((next: ScreenId) => {
+    setNavMotion("none");
+    setStack([next]);
+  }, []);
+  const push = useCallback((next: ScreenId) => {
+    setNavMotion("push");
+    setStack((current) => [...current, next]);
+  }, []);
+  const replaceTop = useCallback((next: ScreenId) => {
+    setNavMotion("replace");
+    setStack((current) => [...current.slice(0, -1), next]);
+  }, []);
   const goBack = useCallback(() => {
-    setStack((current) =>
-      current.length > 1 ? current.slice(0, -1) : current,
-    );
+    if (stackRef.current.length <= 1) {
+      return;
+    }
+    setNavMotion("pop");
+    setStack((current) => current.slice(0, -1));
   }, []);
 
   useEffect(() => {
@@ -542,6 +558,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [push],
   );
 
+  const openMakePlan = useCallback(
+    (friendIds?: string[]) => {
+      const slot = defaultOneOffPlanSlot(
+        new Date(),
+        dataRef.current.settings.defaultDurationMinutes,
+      );
+      setSelectedSlot(slot);
+      setSelectedFriendIds(friendIds ?? []);
+      push("createPlan");
+    },
+    [push],
+  );
+
+  const setSelectedPlanWindow = useCallback(
+    (startAt: string, endAt: string) => {
+      setSelectedSlot(makeOneOffSlot(startAt, endAt));
+    },
+    [],
+  );
+
   const openPlanDetail = useCallback(
     (planId: string) => {
       setActivePlanId(planId);
@@ -586,6 +622,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (friendId) {
         setActiveFriendId(friendId);
         if (stackRef.current.includes("friendProfile")) {
+          setNavMotion("replace");
           setStack((current) => {
             const profileIdx = current.lastIndexOf("friendProfile");
             return profileIdx >= 0
@@ -939,27 +976,48 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const markPlanStatus = useCallback(
-    async (status: PlanStatus) => {
-      if (!activePlanId) return;
+    async (status: PlanStatus, planId?: string) => {
+      const targetId = planId ?? activePlanId;
+      if (!targetId) return;
       if (status === "cancelled") {
-        await commit((current) =>
-          markPlanCancelledState(current, activePlanId),
-        );
-        goWhen();
+        await commit((current) => markPlanCancelledState(current, targetId));
+        if (!planId) {
+          goWhen();
+        }
         return;
       }
       if (status === "done") {
+        const plan = dataRef.current.plans.find((item) => item.id === targetId);
+        if (!plan) return;
+        const yesIds = plan.friends
+          .filter((item) => item.status === "yes")
+          .map((item) => item.friendId);
+        const fallbackIds = plan.friends
+          .filter((item) => item.status !== "moved")
+          .map((item) => item.friendId);
+        await commit((current) =>
+          markPlanDoneState(
+            current,
+            targetId,
+            yesIds.length > 0 ? yesIds : fallbackIds,
+          ),
+        );
+        if (!planId) {
+          goWhen();
+        }
         return;
       }
       await commit((current) => ({
         ...current,
         plans: current.plans.map((plan) =>
-          plan.id === activePlanId
+          plan.id === targetId
             ? { ...plan, status, updatedAt: new Date().toISOString() }
             : plan,
         ),
       }));
-      goWhen();
+      if (!planId) {
+        goWhen();
+      }
     },
     [activePlanId, commit, goWhen],
   );
@@ -999,6 +1057,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       setMoveFriendId(null);
       setActivePlanId(newPlanId);
+      setNavMotion("replace");
       setStack(["when", "planDetail"]);
       return { ok: true };
     },
@@ -1134,6 +1193,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       now,
       screen,
       tab,
+      navMotion,
       selectedSlot,
       selectedFriendIds,
       activePlanId,
@@ -1164,6 +1224,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       openPrivacyPolicy,
       openOnboarding,
       openCreatePlan,
+      openMakePlan,
+      setSelectedPlanWindow,
       openPlanDetail,
       openPastPlans,
       toggleFriendSelection,
@@ -1212,6 +1274,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       now,
       screen,
       tab,
+      navMotion,
       selectedSlot,
       selectedFriendIds,
       activePlanId,
@@ -1241,6 +1304,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       openPrivacyPolicy,
       openOnboarding,
       openCreatePlan,
+      openMakePlan,
+      setSelectedPlanWindow,
       openPlanDetail,
       openPastPlans,
       toggleFriendSelection,

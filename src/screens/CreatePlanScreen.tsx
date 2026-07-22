@@ -4,12 +4,14 @@ import { Alert, Pressable, Text, View } from "react-native";
 import { Avatar } from "../components/Avatar";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { DateSlotPicker } from "../components/DateSlotPicker";
 import { Icon } from "../components/Icon";
 import { Screen } from "../components/Screen";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { TextField } from "../components/TextField";
+import { TimeSlotPicker } from "../components/TimeSlotPicker";
 import { ACTIVITY_OPTIONS, catchUpStatus, formatClock } from "../domain/model";
-import { formatDayHeading } from "../domain/time";
+import { dateAtMinutes, formatDayHeading } from "../domain/time";
 import { color, shadowSoft } from "../foundation";
 import { useApp } from "../state/AppProvider";
 import { cn } from "../ui/cn";
@@ -23,6 +25,7 @@ export function CreatePlanScreen() {
     createPlan,
     goBack,
     openAddFriendForPlan,
+    setSelectedPlanWindow,
     data,
   } = useApp();
 
@@ -36,6 +39,17 @@ export function CreatePlanScreen() {
   const [note, setNote] = useState("");
   const [title, setTitle] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const durationMinutes = useMemo(() => {
+    if (!selectedSlot) {
+      return data.settings.defaultDurationMinutes;
+    }
+    return Math.max(
+      30,
+      selectedSlot.endMinutes - selectedSlot.startMinutes ||
+        data.settings.defaultDurationMinutes,
+    );
+  }, [data.settings.defaultDurationMinutes, selectedSlot]);
 
   const slotLabel = useMemo(() => {
     if (!selectedSlot) {
@@ -53,11 +67,17 @@ export function CreatePlanScreen() {
       <Screen>
         <ScreenHeader title="Make a plan" onBack={goBack} />
         <Text className="text-body text-muted">
-          Pick a free time from When first.
+          Something went wrong picking a time. Go back and try again.
         </Text>
       </Screen>
     );
   }
+
+  const applyWindow = (dateKey: string, startMinutes: number) => {
+    const start = dateAtMinutes(dateKey, startMinutes);
+    const end = new Date(start.getTime() + durationMinutes * 60_000);
+    setSelectedPlanWindow(start.toISOString(), end.toISOString());
+  };
 
   const resolvedActivity =
     activity === "custom" ? customActivity.trim() : activity;
@@ -105,7 +125,7 @@ export function CreatePlanScreen() {
         <Text className="text-caption text-muted">
           {step === "friends"
             ? "Step 1 of 2 · Pick your people"
-            : "Step 2 of 2 · Ready to invite"}
+            : "Step 2 of 2 · When and details"}
         </Text>
       </View>
 
@@ -164,7 +184,7 @@ export function CreatePlanScreen() {
                       size={44}
                     />
                     <View className="flex-1">
-                      <Text className="font-sans-bold text-body text-ink">
+                      <Text className="font-sans-semibold text-body text-ink">
                         {friend.name}
                       </Text>
                       <Text className="text-caption text-muted">
@@ -200,6 +220,34 @@ export function CreatePlanScreen() {
         </>
       ) : (
         <>
+          <Card className="gap-3 p-4">
+            <Text className="font-sans-semibold text-body text-ink">When</Text>
+            <Text className="text-caption text-muted">
+              Change this anytime — free-time suggestions are optional.
+            </Text>
+            <DateSlotPicker
+              label="Date"
+              date={selectedSlot.date}
+              onChange={(dateKey) =>
+                applyWindow(dateKey, selectedSlot.startMinutes)
+              }
+            />
+            <TimeSlotPicker
+              label="Starts"
+              minutes={selectedSlot.startMinutes}
+              timeFormat24h={data.settings.timeFormat24h}
+              onChange={(minutes) => applyWindow(selectedSlot.date, minutes)}
+            />
+            <Text className="text-caption text-muted">
+              Ends{" "}
+              {formatClock(
+                selectedSlot.endMinutes,
+                data.settings.timeFormat24h,
+              )}{" "}
+              ({durationMinutes} min)
+            </Text>
+          </Card>
+
           <Card className="gap-2 p-4">
             <Text className="text-body text-ink">
               {selectedFriendIds.length === 1

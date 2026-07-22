@@ -7,6 +7,7 @@ import {
   buildInviteText,
   buildTimeline,
   catchUpStatus,
+  defaultOneOffPlanSlot,
   intervalsOverlap,
   proposePlanWindow,
   rhythmDays,
@@ -20,6 +21,10 @@ import {
   skipOccurrenceOnce,
   updateSettings,
 } from "../src/domain/mutations";
+import {
+  buildReminderSpecs,
+  CATCH_UP_NUDGE_WEEKS,
+} from "../src/domain/reminders";
 import { calendarDaysBetween, daysSince, startOfDay } from "../src/domain/time";
 import type {
   AppData,
@@ -34,7 +39,6 @@ import {
   SCHEMA_VERSION,
 } from "../src/persistence/migrate";
 import { applyUpdaters } from "../src/persistence/writeQueue";
-import { buildReminderSpecs } from "../src/domain/reminders";
 
 const now = new Date("2026-07-21T12:00:00.000Z");
 
@@ -333,5 +337,63 @@ const specs = buildReminderSpecs(
 );
 assert.ok(specs.length >= 1);
 assert.ok(specs.every((s) => !s.body.toLowerCase().includes("ana")));
+
+{
+  const dueFriends = [
+    {
+      id: "aaron",
+      name: "Aaron",
+      photoUri: null,
+      phone: "",
+      shareMethod: "message" as const,
+      rhythm: "weekly" as const,
+      customDays: 45,
+      lastMetAt: "2020-01-01T12:00:00.000Z",
+      createdAt: "2026-01-01T12:00:00.000Z",
+    },
+    {
+      id: "bella",
+      name: "Bella",
+      photoUri: null,
+      phone: "",
+      shareMethod: "message" as const,
+      rhythm: "weekly" as const,
+      customDays: 45,
+      lastMetAt: "2020-01-01T12:00:00.000Z",
+      createdAt: "2026-01-01T12:00:00.000Z",
+    },
+  ];
+  const catchUpSpecs = buildReminderSpecs(
+    {
+      ...emptyAppData(),
+      settings: {
+        ...emptyAppData().settings,
+        notificationsEnabled: true,
+        notifyCatchUpDue: true,
+        notifyPlanTomorrow: false,
+        notifyAskIfHappened: false,
+        showReminderNames: true,
+      },
+      friends: dueFriends,
+    },
+    new Date(2026, 6, 21, 12, 0),
+  );
+  const catchUps = catchUpSpecs.filter((s) => s.key.startsWith("catchup:"));
+  assert.equal(catchUps.length, CATCH_UP_NUDGE_WEEKS);
+  assert.ok(catchUps.some((s) => s.body.includes("Aaron")));
+  assert.ok(catchUps.some((s) => s.body.includes("Bella")));
+  assert.ok(
+    catchUps[0]!.triggerAt.getTime() < catchUps[1]!.triggerAt.getTime(),
+  );
+}
+
+{
+  const slot = defaultOneOffPlanSlot(new Date(2026, 6, 21, 12, 0), 60);
+  assert.equal(slot.ruleId, null);
+  assert.ok(slot.key.startsWith("oneoff:"));
+  assert.ok(
+    new Date(slot.startAt).getTime() > new Date(2026, 6, 21, 12, 0).getTime(),
+  );
+}
 
 console.log("all tests: ok");

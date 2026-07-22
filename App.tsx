@@ -34,7 +34,8 @@ import { WhenScreen } from "./src/screens/WhenScreen";
 import { AppProvider, useApp } from "./src/state/AppProvider";
 
 function Root() {
-  const { ready, screen, tab, goWhen, goFriends, goSettings } = useApp();
+  const { ready, screen, tab, navMotion, goWhen, goFriends, goSettings } =
+    useApp();
 
   if (!ready || screen === "loading") {
     return (
@@ -107,7 +108,12 @@ function Root() {
   return (
     <View className="flex-1 bg-canvas font-sans">
       <View className="flex-1">
-        <ScreenTransition screenKey={screen}>{content}</ScreenTransition>
+        <ScreenTransition
+          screenKey={screen}
+          motion={showTabs ? "none" : navMotion}
+        >
+          {content}
+        </ScreenTransition>
       </View>
       {showTabs ? (
         <BottomNav
