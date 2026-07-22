@@ -9,7 +9,7 @@ Friends do not need So, When?, an account, or an invitation link. Version 1 is a
 ## Build for the first Google Play release
 
 - Expo-managed React Native app, TypeScript, Android-first.
-- Package id: `com.palarilabs.vemos`. Change only if Play Console rejects it.
+- Package id: `com.sowhen.myapp` (matches Google Play Console). Do not change without an explicit Play decision.
 - Start with `npm install`, then `npm run android`.
 - Keep the first release local-first: no account, backend, OAuth, payments, analytics, or remote database without an explicit decision.
 - Use Expo modules and the native share sheet. Do not build a messaging system.

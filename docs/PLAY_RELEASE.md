@@ -3,7 +3,7 @@
 ## Already prepared
 
 - Expo managed app **So, When?** by **Palari Labs, Inc.**
-- Android package `com.palarilabs.vemos` (legacy id — change only if Play Console rejects it).
+- Android package `com.sowhen.myapp` (must match Google Play Console).
 - Brand assets in `assets/` (app icon, adaptive icons, splash, store icon, feature graphic).
 - eas.json with internal preview and production profiles (**no EAS projectId/owner invented in-repo**).
 - Android-first scope, visual rules, and quality gate in AGENTS.md.

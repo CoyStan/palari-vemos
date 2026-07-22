@@ -2,7 +2,7 @@
 
 export const PRIVACY_POLICY_EFFECTIVE_DATE = "July 21, 2026";
 export const PRIVACY_CONTACT_EMAIL = "privacy@palari.io";
-export const PRIVACY_PACKAGE_ID = "com.palarilabs.vemos";
+export const PRIVACY_PACKAGE_ID = "com.sowhen.myapp";
 
 export const PRIVACY_POLICY_SECTIONS: { title: string; body: string }[] = [
   {
