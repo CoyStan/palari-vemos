@@ -83,8 +83,13 @@ export function FriendFormScreen({ mode }: Props) {
       }
       setName(picked.name);
       setPhone(picked.phone);
-      const owned = await ownPhoto(picked.photoUri, "contact");
-      setPhotoUri(owned);
+      if (picked.photoUri) {
+        const owned = await ownPhoto(picked.photoUri, "contact");
+        if (owned) {
+          setPhotoUri(owned);
+        }
+        // Keep existing photo if contact has none or copy fails.
+      }
     } catch {
       Alert.alert(
         "Could not open contacts",

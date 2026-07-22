@@ -18,6 +18,7 @@ import {
   INVITE_STATUS_LABELS,
   lastMetLabel,
   PLAN_STATUS_LABELS,
+  proposePlanWindow,
 } from "../domain/model";
 import {
   addDays,
@@ -46,11 +47,13 @@ function greeting(): string {
 export function WhenScreen() {
   const {
     data,
+    now,
     timeline,
     spotlightPlan: todaySpotlight,
     openAddAvailability,
     openCreatePlan,
     openPlanDetail,
+    openPastPlans,
     openAddFriend,
     openFriendProfile,
     skipOccurrence,
@@ -114,6 +117,23 @@ export function WhenScreen() {
     const today = startOfDay(new Date());
     setFocusDate(today);
     setWeekStart(startOfWeek(today, firstDay));
+  };
+
+  const openProposedSlot = (slot: ConcreteSlot) => {
+    const window = proposePlanWindow(
+      slot.startAt,
+      slot.endAt,
+      data.settings.defaultDurationMinutes,
+    );
+    const start = new Date(window.startAt);
+    const end = new Date(window.endAt);
+    setSheetSlot({
+      ...slot,
+      startAt: window.startAt,
+      endAt: window.endAt,
+      startMinutes: start.getHours() * 60 + start.getMinutes(),
+      endMinutes: end.getHours() * 60 + end.getMinutes(),
+    });
   };
 
   const onMakePlan = (slot: ConcreteSlot, friendIds: string[]) => {
@@ -271,6 +291,17 @@ export function WhenScreen() {
           </View>
         ) : null}
 
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Past plans"
+          onPress={openPastPlans}
+          className="mb-3 min-h-[44px] justify-center self-start px-1"
+        >
+          <Text className="font-sans-semibold text-caption text-primary">
+            Past plans
+          </Text>
+        </Pressable>
+
         {mode !== "list" ? (
           <View className="mb-3 flex-row items-center gap-2">
             <Pressable
@@ -421,7 +452,7 @@ export function WhenScreen() {
                     <PressableScale
                       accessibilityRole="button"
                       accessibilityLabel={`Free ${formatDayHeading(start)}, tap to make a plan`}
-                      onPress={() => setSheetSlot(item.slot)}
+                      onPress={() => openProposedSlot(item.slot)}
                     >
                       <View className="rounded-card bg-primary-soft p-4">
                         <Text className="font-sans-semibold text-caption text-primary">
@@ -535,10 +566,11 @@ export function WhenScreen() {
               dayStartHour={data.settings.calendarDayStartHour}
               dayEndHour={data.settings.calendarDayEndHour}
               onFocusDate={setFocusDate}
-              onOpenSlot={setSheetSlot}
+              onOpenSlot={openProposedSlot}
               onSkipSlot={onRequestSkip}
               onOpenPlan={openPlanDetail}
               onSwitchToDay={() => setMode("day")}
+              now={now}
             />
           </View>
         )}

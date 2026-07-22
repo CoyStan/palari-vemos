@@ -83,6 +83,7 @@ export function PlanDetailScreen() {
   const [memoryPhoto, setMemoryPhoto] = useState<string | null>(null);
 
   const prevStatus = useRef<string | null>(null);
+  const draftPlanIdRef = useRef<string | null>(null);
   const bloom = useSharedValue(0);
 
   useEffect(() => {
@@ -93,11 +94,18 @@ export function PlanDetailScreen() {
     setActivity(activePlan.activity);
     setPlace(activePlan.place);
     setNote(activePlan.note);
-    setInviteDrafts(
-      Object.fromEntries(
-        activePlan.friends.map((item) => [item.friendId, item.invitationText]),
-      ),
-    );
+    if (draftPlanIdRef.current !== activePlan.id) {
+      draftPlanIdRef.current = activePlan.id;
+      setInviteDrafts(
+        Object.fromEntries(
+          activePlan.friends.map((item) => [
+            item.friendId,
+            item.invitationText,
+          ]),
+        ),
+      );
+      setEditingInvite({});
+    }
 
     const prev = prevStatus.current;
     prevStatus.current = activePlan.status;
@@ -165,6 +173,14 @@ export function PlanDetailScreen() {
     const text = inviteDrafts[friendId];
     if (text === undefined) return;
     void updateInvitationText(friendId, text);
+    setEditingInvite((current) => ({ ...current, [friendId]: false }));
+  };
+
+  const cancelInviteEdit = (friendId: string) => {
+    const original =
+      activePlan?.friends.find((item) => item.friendId === friendId)
+        ?.invitationText ?? "";
+    setInviteDrafts((current) => ({ ...current, [friendId]: original }));
     setEditingInvite((current) => ({ ...current, [friendId]: false }));
   };
 
@@ -384,32 +400,44 @@ export function PlanDetailScreen() {
                   </View>
 
                   {isEditing ? (
-                    <TextField
-                      label="Invitation"
-                      value={draft}
-                      onChangeText={(text) => {
-                        setInviteDrafts((current) => ({
-                          ...current,
-                          [item.friendId]: text,
-                        }));
-                      }}
-                      onBlur={() => saveInviteText(item.friendId)}
-                      multiline
-                      className="min-h-[96px]"
-                    />
+                    <View className="gap-2">
+                      <TextField
+                        label="Invitation"
+                        value={draft}
+                        onChangeText={(text) => {
+                          setInviteDrafts((current) => ({
+                            ...current,
+                            [item.friendId]: text,
+                          }));
+                        }}
+                        multiline
+                        className="min-h-[96px]"
+                      />
+                      <Button
+                        label="Save message"
+                        onPress={() => saveInviteText(item.friendId)}
+                      />
+                      <Button
+                        label="Cancel"
+                        variant="ghost"
+                        onPress={() => cancelInviteEdit(item.friendId)}
+                      />
+                    </View>
                   ) : (
                     <View className="gap-2">
                       <Text className="text-body text-ink">{draft}</Text>
-                      <Button
-                        label="Edit message"
-                        variant="secondary"
-                        onPress={() =>
-                          setEditingInvite((current) => ({
-                            ...current,
-                            [item.friendId]: true,
-                          }))
-                        }
-                      />
+                      {!isTerminal ? (
+                        <Button
+                          label="Edit message"
+                          variant="secondary"
+                          onPress={() =>
+                            setEditingInvite((current) => ({
+                              ...current,
+                              [item.friendId]: true,
+                            }))
+                          }
+                        />
+                      ) : null}
                     </View>
                   )}
 

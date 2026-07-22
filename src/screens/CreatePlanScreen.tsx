@@ -22,7 +22,7 @@ export function CreatePlanScreen() {
     toggleFriendSelection,
     createPlan,
     goBack,
-    openAddFriend,
+    openAddFriendForPlan,
     data,
   } = useApp();
 
@@ -42,7 +42,10 @@ export function CreatePlanScreen() {
       return "";
     }
     const start = new Date(selectedSlot.startAt);
-    return `${formatDayHeading(start)} · ${formatClock(selectedSlot.startMinutes, data.settings.timeFormat24h)}`;
+    const end = new Date(selectedSlot.endAt);
+    const startMin = start.getHours() * 60 + start.getMinutes();
+    const endMin = end.getHours() * 60 + end.getMinutes();
+    return `${formatDayHeading(start)} · ${formatClock(startMin, data.settings.timeFormat24h)} – ${formatClock(endMin, data.settings.timeFormat24h)}`;
   }, [data.settings.timeFormat24h, selectedSlot]);
 
   if (!selectedSlot) {
@@ -113,10 +116,18 @@ export function CreatePlanScreen() {
               <Text className="text-body text-muted">
                 Add a friend before making a plan.
               </Text>
-              <Button label="Add a friend" onPress={openAddFriend} />
+              <Button
+                label="Add a friend"
+                onPress={() => openAddFriendForPlan(selectedSlot)}
+              />
             </Card>
           ) : (
             <View className="gap-2">
+              <Button
+                label="Add someone new"
+                variant="ghost"
+                onPress={() => openAddFriendForPlan(selectedSlot)}
+              />
               {sortedFriends.map((friend) => {
                 const selected = selectedFriendIds.includes(friend.id);
                 const due = catchUpStatus(friend) === "due";

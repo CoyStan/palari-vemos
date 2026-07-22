@@ -104,9 +104,9 @@ export function OnboardingScreen() {
     setPhone(contact.phone ?? "");
     if (contact.photoUri) {
       const owned = await copyIntoOwnedMedia(contact.photoUri, "contact");
-      setPhotoUri(owned.ok ? owned.uri : null);
-    } else {
-      setPhotoUri(null);
+      if (owned.ok) {
+        setPhotoUri(owned.uri);
+      }
     }
   };
 

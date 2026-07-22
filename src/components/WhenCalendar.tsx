@@ -26,10 +26,10 @@ const PLAN_CHIP: Record<
   PlanStatus,
   { bg: string; fg: string; border: string }
 > = {
-  draft: { bg: color.softCoral, fg: "#C96B5A", border: "#F5C4B8" },
+  draft: { bg: color.softCoral, fg: color.coralDeep, border: "#F5C4B8" },
   waiting: { bg: color.softTeal, fg: color.primary, border: "#B7E0DD" },
   on: { bg: "#ECFDF3", fg: color.success, border: "#A7F3C0" },
-  needs_time: { bg: color.softCoral, fg: "#C96B5A", border: "#F5C4B8" },
+  needs_time: { bg: color.softCoral, fg: color.coralDeep, border: "#F5C4B8" },
   done: { bg: color.canvas, fg: color.muted, border: color.border },
   cancelled: { bg: color.canvas, fg: color.muted, border: color.border },
 };
@@ -51,6 +51,8 @@ type Props = {
   onSkipSlot?: (slot: ConcreteSlot) => void;
   onOpenPlan: (planId: string) => void;
   onSwitchToDay: () => void;
+  /** Provider minute tick — drives the current-time line. */
+  now: Date;
 };
 
 export function WhenCalendar({
@@ -68,10 +70,11 @@ export function WhenCalendar({
   onSkipSlot,
   onOpenPlan,
   onSwitchToDay,
+  now,
 }: Props) {
   const [gridWidth, setGridWidth] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
-  const todayKey = formatDateKey(new Date());
+  const todayKey = formatDateKey(now);
   const focusKey = formatDateKey(focusDate);
   const visibleDays = mode === "day" ? [focusDate] : days;
   const startHour = Math.max(0, Math.min(23, dayStartHour));
@@ -84,9 +87,8 @@ export function WhenCalendar({
     visibleDays.length > 0 ? daysAreaWidth / visibleDays.length : 0;
 
   const nowMinutes = useMemo(() => {
-    const now = new Date();
     return now.getHours() * 60 + now.getMinutes();
-  }, []);
+  }, [now]);
 
   const activePlans = plans.filter((plan) => plan.status !== "cancelled");
 
@@ -348,6 +350,10 @@ function FreeBlockView({
       onAccessibilityAction={(event) => {
         if (event.nativeEvent.actionName === "skip") {
           onLongPress?.();
+          return;
+        }
+        if (event.nativeEvent.actionName === "activate") {
+          onPress();
         }
       }}
       disabled={booked}
@@ -357,7 +363,7 @@ function FreeBlockView({
       className="absolute z-[1] rounded-[10px] border border-dashed border-primary-softBorder bg-primary-soft px-1.5 py-1"
       style={{
         top,
-        height: Math.max(height - 3, 28),
+        height: Math.max(height - 3, 44),
         width: Math.max(dayWidth - 4, 12),
         left: 2,
         opacity: booked ? 0.4 : 1,
@@ -410,7 +416,7 @@ function PlanBlockView({
       className="absolute z-[2] rounded-[10px] border px-1.5 py-1"
       style={{
         top,
-        height: Math.max(height - 3, 32),
+        height: Math.max(height - 3, 44),
         width: Math.max(dayWidth - 4, 12),
         left: 2,
         backgroundColor: chip.bg,

@@ -45,7 +45,6 @@ const html = `<!DOCTYPE html>
 <body>
   <h1>Privacy Policy — So, When?</h1>
   <p class="meta">Effective date: ${PRIVACY_POLICY_EFFECTIVE_DATE}<br />App: So, When?<br />Android package: ${PRIVACY_PACKAGE_ID}<br />Publisher: Palari Labs, Inc.<br />Contact: ${PRIVACY_CONTACT_EMAIL}</p>
-  <p class="meta"><strong>Deployment needed:</strong> publish this file (docs/privacy-policy.html) to a public HTTPS URL, then paste that URL into Google Play Console → App content → Privacy policy. It is not hosted yet.</p>
 ${sections}
 </body>
 </html>

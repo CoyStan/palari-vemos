@@ -56,7 +56,7 @@ export type LoadResult =
   | { ok: true; data: AppData; warnings: string[]; healedFromBackup?: boolean }
   | {
       ok: false;
-      reason: "corrupt" | "unreadable" | "incompatible";
+      reason: "corrupt" | "unreadable" | "incompatible" | "missing";
       message: string;
       raw: string | null;
     };
@@ -292,6 +292,31 @@ function parsePlanFriend(
   };
 }
 
+/** Map attendance IDs onto current plan friend rows, including gone_ tombstones. */
+export function normalizeAttendedFriendIds(
+  rawIds: string[],
+  friends: PlanFriend[],
+): string[] {
+  const friendIds = new Set(friends.map((item) => item.friendId));
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const id of rawIds) {
+    let normalized = id;
+    if (!friendIds.has(id) && friendIds.has(`gone_${id}`)) {
+      normalized = `gone_${id}`;
+    }
+    if (!friendIds.has(normalized)) continue;
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(normalized);
+  }
+  return out;
+}
+
+function isTerminalStatus(status: PlanStatus): boolean {
+  return status === "done" || status === "cancelled";
+}
+
 function parsePlan(
   value: unknown,
   friendIds: Set<string>,
@@ -309,7 +334,7 @@ function parsePlan(
     warnings.push(`Dropped plan ${value.id}: invalid startAt.`);
     return null;
   }
-  const status = asEnum(value.status, PLAN_STATUSES, "draft");
+  let status = asEnum(value.status, PLAN_STATUSES, "draft");
   const endAt = asString(value.endAt, value.startAt);
   const friends = Array.isArray(value.friends)
     ? value.friends
@@ -317,19 +342,22 @@ function parsePlan(
         .filter((item): item is PlanFriend => item !== null)
     : [];
 
-  // Attendance: only keep IDs that appear on the plan; never invent from yes-status alone.
   const attendedFriendIds = Array.isArray(value.attendedFriendIds)
-    ? value.attendedFriendIds
-        .filter((id): id is string => typeof id === "string")
-        .filter((id) =>
-          friends.some(
-            (item) =>
-              item.friendId === id ||
-              item.friendId === `gone_${id}` ||
-              id.startsWith("gone_"),
-          ),
-        )
+    ? normalizeAttendedFriendIds(
+        value.attendedFriendIds.filter(
+          (id): id is string => typeof id === "string",
+        ),
+        friends,
+      )
     : [];
+
+  const activeParticipants = friends.filter((item) => item.status !== "moved");
+  if (!isTerminalStatus(status) && activeParticipants.length === 0) {
+    warnings.push(
+      `Cancelled plan ${value.id}: no remaining participants after migration.`,
+    );
+    status = "cancelled";
+  }
 
   return {
     id: value.id,
@@ -346,7 +374,10 @@ function parsePlan(
     memoryPhotoUri: asNullableString(value.memoryPhotoUri),
     attendedFriendIds,
     completedAt: asNullableString(value.completedAt),
-    cancelledAt: asNullableString(value.cancelledAt),
+    cancelledAt:
+      status === "cancelled"
+        ? (asNullableString(value.cancelledAt) ?? new Date().toISOString())
+        : asNullableString(value.cancelledAt),
     createdAt: asString(value.createdAt, new Date().toISOString()),
     updatedAt: asString(value.updatedAt, new Date().toISOString()),
   };
@@ -361,6 +392,21 @@ function parseSkipped(
   const date = asString(value.date);
   if (!ruleId || !isDateKey(date) || !ruleIds.has(ruleId)) return null;
   return { ruleId, date };
+}
+
+/**
+ * Current-schema documents must include top-level arrays/objects.
+ * Legacy (no schemaVersion) stays tolerant.
+ */
+function currentSchemaShapeInvalid(parsed: Record<string, unknown>): boolean {
+  if (typeof parsed.schemaVersion !== "number") return false;
+  if (parsed.schemaVersion > SCHEMA_VERSION) return false;
+  if (!Array.isArray(parsed.friends)) return true;
+  if (!Array.isArray(parsed.availability)) return true;
+  if (!Array.isArray(parsed.skipped)) return true;
+  if (!Array.isArray(parsed.plans)) return true;
+  if (parsed.settings !== undefined && !isRecord(parsed.settings)) return true;
+  return false;
 }
 
 /** Migrate any stored payload (versioned or legacy) into validated AppData. */
@@ -398,6 +444,15 @@ export function migrateAndValidate(raw: string | null): LoadResult {
       ok: false,
       reason: "incompatible",
       message: `This save was written by a newer So, When? (schema ${parsed.schemaVersion}). Update the app to open it.`,
+      raw,
+    };
+  }
+
+  if (currentSchemaShapeInvalid(parsed)) {
+    return {
+      ok: false,
+      reason: "corrupt",
+      message: "Your saved data is missing required fields.",
       raw,
     };
   }

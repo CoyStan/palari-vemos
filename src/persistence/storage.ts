@@ -28,23 +28,112 @@ const defaultAdapter: StorageAdapter = {
   multiRemove: (keys) => AsyncStorage.multiRemove(keys),
 };
 
+export type KeyRead =
+  | { status: "absent" }
+  | { status: "unreadable"; message: string }
+  | { status: "present"; raw: string };
+
+export async function readStorageKey(
+  key: string,
+  adapter: StorageAdapter = defaultAdapter,
+): Promise<KeyRead> {
+  try {
+    const raw = await adapter.getItem(key);
+    if (isAbsentRaw(raw)) {
+      return { status: "absent" };
+    }
+    return { status: "present", raw: raw as string };
+  } catch (error) {
+    return {
+      status: "unreadable",
+      message:
+        error instanceof Error
+          ? error.message
+          : "Could not read local storage.",
+    };
+  }
+}
+
+function isIncompatible(
+  result: LoadResult | null,
+): result is Extract<LoadResult, { ok: false; reason: "incompatible" }> {
+  return Boolean(result && !result.ok && result.reason === "incompatible");
+}
+
+async function healFromBackup(
+  backup: Extract<LoadResult, { ok: true }>,
+  warning: string,
+  adapter: StorageAdapter,
+): Promise<LoadResult> {
+  try {
+    await saveAppData(backup.data, adapter);
+  } catch {
+    /* heal best-effort; still return backup data — never leave future schemas */
+  }
+  return {
+    ...backup,
+    healedFromBackup: true,
+    warnings: [...backup.warnings, warning],
+  };
+}
+
 /**
- * Load with primary/backup matrix:
- * - absent+absent → empty
- * - valid primary → primary
- * - invalid/absent primary + valid backup → backup + heal primary
- * - invalid primary + absent/invalid backup → Recovery error
- * - future schema → incompatible Recovery error
+ * Load with primary/backup matrix.
+ * Future/incompatible schema in either key is authoritative — never overwrite it.
  */
 export async function loadAppData(
   adapter: StorageAdapter = defaultAdapter,
 ): Promise<LoadResult> {
-  let primaryRaw: string | null = null;
-  let backupRaw: string | null = null;
+  const primaryRead = await readStorageKey(STORAGE_KEY, adapter);
+  const backupRead = await readStorageKey(BACKUP_KEY, adapter);
 
-  try {
-    primaryRaw = await adapter.getItem(STORAGE_KEY);
-  } catch {
+  if (primaryRead.status === "absent" && backupRead.status === "absent") {
+    return { ok: true, data: emptyAppData(), warnings: [] };
+  }
+
+  // Missing primary + backup read failure is not a fresh install.
+  if (primaryRead.status === "absent" && backupRead.status === "unreadable") {
+    return {
+      ok: false,
+      reason: "unreadable",
+      message: "Could not read the backup save, and no primary save was found.",
+      raw: null,
+    };
+  }
+
+  const primary =
+    primaryRead.status === "present"
+      ? migrateAndValidate(primaryRead.raw)
+      : null;
+  const backup =
+    backupRead.status === "present" ? migrateAndValidate(backupRead.raw) : null;
+
+  // Incompatible anywhere wins — zero writes, never downgrade.
+  if (isIncompatible(primary)) {
+    return primary;
+  }
+  if (isIncompatible(backup)) {
+    return backup;
+  }
+
+  if (primary?.ok) {
+    return primary;
+  }
+
+  // Primary read failed at IO layer but backup is valid → recover with warning.
+  if (primaryRead.status === "unreadable" && backup?.ok) {
+    return healFromBackup(
+      backup,
+      "Restored from backup because the primary save could not be read.",
+      adapter,
+    );
+  }
+
+  // Both unreadable.
+  if (
+    primaryRead.status === "unreadable" &&
+    (backupRead.status === "unreadable" || backupRead.status === "absent")
+  ) {
     return {
       ok: false,
       reason: "unreadable",
@@ -53,43 +142,12 @@ export async function loadAppData(
     };
   }
 
-  try {
-    backupRaw = await adapter.getItem(BACKUP_KEY);
-  } catch {
-    backupRaw = null;
-  }
-
-  const primaryAbsent = isAbsentRaw(primaryRaw);
-  const backupAbsent = isAbsentRaw(backupRaw);
-
-  if (primaryAbsent && backupAbsent) {
-    return { ok: true, data: emptyAppData(), warnings: [] };
-  }
-
-  const primary = primaryAbsent ? null : migrateAndValidate(primaryRaw);
-
-  if (primary?.ok) {
-    return primary;
-  }
-
-  const backup = backupAbsent ? null : migrateAndValidate(backupRaw);
-
   if (backup?.ok) {
-    try {
-      await saveAppData(backup.data, adapter);
-    } catch {
-      /* heal best-effort; still return backup data */
-    }
-    return {
-      ...backup,
-      healedFromBackup: true,
-      warnings: [
-        ...backup.warnings,
-        primaryAbsent
-          ? "Restored from backup because the primary save was missing."
-          : "Restored from the last known good backup because the primary save was unreadable.",
-      ],
-    };
+    const warning =
+      primaryRead.status === "absent"
+        ? "Restored from backup because the primary save was missing."
+        : "Restored from the last known good backup because the primary save could not be used.";
+    return healFromBackup(backup, warning, adapter);
   }
 
   if (primary && !primary.ok) {
@@ -99,11 +157,25 @@ export async function loadAppData(
     return backup;
   }
 
+  if (primaryRead.status === "absent" && backupRead.status === "present") {
+    return {
+      ok: false,
+      reason: "corrupt",
+      message: "Your backup save could not be recovered.",
+      raw: backupRead.raw,
+    };
+  }
+
   return {
     ok: false,
     reason: "corrupt",
     message: "Your saved data could not be recovered.",
-    raw: primaryRaw ?? backupRaw,
+    raw:
+      primaryRead.status === "present"
+        ? primaryRead.raw
+        : backupRead.status === "present"
+          ? backupRead.raw
+          : null,
   };
 }
 

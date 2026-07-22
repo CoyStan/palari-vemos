@@ -24,7 +24,7 @@ type Props = {
  * then continue into the full plan flow.
  */
 export function InviteSheet({ slot, onClose, onMakePlan }: Props) {
-  const { sortedFriends, data, openAddFriend } = useApp();
+  const { sortedFriends, data, openAddFriendForPlan } = useApp();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   useEffect(() => {
@@ -42,6 +42,9 @@ export function InviteSheet({ slot, onClose, onMakePlan }: Props) {
   };
 
   const start = slot ? new Date(slot.startAt) : null;
+  const end = slot ? new Date(slot.endAt) : null;
+  const startMin = start ? start.getHours() * 60 + start.getMinutes() : 0;
+  const endMin = end ? end.getHours() * 60 + end.getMinutes() : 0;
 
   return (
     <AnimatedDialog
@@ -56,9 +59,9 @@ export function InviteSheet({ slot, onClose, onMakePlan }: Props) {
               {formatDayHeading(start)}
             </Text>
             <Text className="font-sans-bold text-section text-ink">
-              {formatClock(slot.startMinutes, data.settings.timeFormat24h)}
+              {formatClock(startMin, data.settings.timeFormat24h)}
               {" – "}
-              {formatClock(slot.endMinutes, data.settings.timeFormat24h)}
+              {formatClock(endMin, data.settings.timeFormat24h)}
             </Text>
             <Text className="text-body text-muted">
               You’re free. Who should come?
@@ -75,7 +78,7 @@ export function InviteSheet({ slot, onClose, onMakePlan }: Props) {
                 variant="secondary"
                 onPress={() => {
                   onClose();
-                  openAddFriend();
+                  openAddFriendForPlan(slot);
                 }}
               />
             </View>
@@ -136,14 +139,24 @@ export function InviteSheet({ slot, onClose, onMakePlan }: Props) {
           )}
 
           {sortedFriends.length > 0 ? (
-            <Button
-              label={
-                selectedIds.length > 0
-                  ? `Make a plan with ${selectedIds.length === 1 ? "1 person" : `${selectedIds.length} people`}`
-                  : "Make a plan"
-              }
-              onPress={() => onMakePlan(slot, selectedIds)}
-            />
+            <View className="gap-2">
+              <Button
+                label="Add someone new"
+                variant="ghost"
+                onPress={() => {
+                  onClose();
+                  openAddFriendForPlan(slot);
+                }}
+              />
+              <Button
+                label={
+                  selectedIds.length > 0
+                    ? `Make a plan with ${selectedIds.length === 1 ? "1 person" : `${selectedIds.length} people`}`
+                    : "Make a plan"
+                }
+                onPress={() => onMakePlan(slot, selectedIds)}
+              />
+            </View>
           ) : null}
         </View>
       ) : null}
