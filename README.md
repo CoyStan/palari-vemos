@@ -22,9 +22,9 @@ So, When? is the tiny Palari Labs, Inc. app that turns “we should catch up som
 
 Three tabs:
 
-1. **When** — next 2–3 weeks of free times and plans; FAB to add availability
+1. **When** — List / Week / Months; make a plan or add free time via +
 2. **Friends** — people you want to see; add by typing a name
-3. **Settings** — quiet reminders, defaults, privacy, export / wipe
+3. **Settings** — quiet reminders, defaults, privacy, feedback, export / wipe
 
 ## Styling
 

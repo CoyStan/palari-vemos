@@ -343,9 +343,9 @@ render path found in evaluation.
 
 **Acceptance.**
 
-- [ ] Feedback row opens the mail composer on device/emulator; failure path
+- [x] Feedback row opens the mail composer on device/emulator; failure path
       shows the address.
-- [ ] `grep -r "buildInsight" src` returns nothing; gates green.
+- [x] `grep -r "buildInsight" src` returns nothing; gates green.
 
 ## WP8 — Release polish + full verification
 
@@ -374,9 +374,9 @@ render path found in evaluation.
 
 **Acceptance.**
 
-- [ ] Every command above green; manifest assertions pass.
-- [ ] All WP boxes in this contract checked; Implementation notes filled in.
-- [ ] All commits pushed to `claude/first-app-evaluation-m1qxhu`.
+- [x] Every command above green; manifest assertions pass.
+- [x] All WP boxes in this contract checked; Implementation notes filled in.
+- [x] All commits pushed to `claude/first-app-evaluation-m1qxhu`.
 
 ---
 
@@ -392,15 +392,15 @@ render path found in evaluation.
 
 ## Definition of Done (final gate)
 
-- [ ] WP1–WP8 all checked and individually committed + pushed.
-- [ ] `npm run format:check && npm run typecheck && npm test && npm run doctor
+- [x] WP1–WP8 all checked and individually committed + pushed.
+- [x] `npm run format:check && npm run typecheck && npm test && npm run doctor
     && npm run export:android` all pass at HEAD.
-- [ ] Prebuild manifest clean per WP8 (no sensitive permissions).
-- [ ] `npm run sync:privacy` passes; in-app policy, `docs/PRIVACY_POLICY.md`,
+- [x] Prebuild manifest clean per WP8 (no sensitive permissions).
+- [x] `npm run sync:privacy` passes; in-app policy, `docs/PRIVACY_POLICY.md`,
       `docs/privacy-policy.html` agree and match actual behavior.
-- [ ] No new network calls, permissions, analytics, streak mechanics, or
+- [x] No new network calls, permissions, analytics, streak mechanics, or
       dependencies beyond `expo-calendar`.
-- [ ] `app.json` version `0.2.0`.
+- [x] `app.json` version `0.2.0`.
 
 ## Implementation notes (append during execution)
 
@@ -437,3 +437,16 @@ render path found in evaluation.
   default export throws deprecation stubs).
 - Calendar permissions appear only as `tools:node="remove"` via
   `blockedPermissions`.
+
+### WP7
+- `SUPPORT_EMAIL` aliases `PRIVACY_CONTACT_EMAIL` (`privacy@palari.io`).
+- Feedback uses transitive `expo-constants` (not added as a direct dep).
+
+### WP8
+- Bumped app/`package.json` to `0.2.0`.
+- Ran `npx expo install --fix` so `expo-doctor` passes (patch bumps of
+  existing Expo packages only; sole intentional new dep remains
+  `expo-calendar` from WP6).
+- Prebuild sensitive permissions appear only with `tools:node="remove"`.
+- Also present (expected Expo defaults, not blocked): `INTERNET`,
+  `SYSTEM_ALERT_WINDOW`, `VIBRATE`.

@@ -49,12 +49,17 @@ Contact import was removed for v0.2. Friends are added by typing a name only. `e
 Before calling an internal release ready, install the preview APK and verify:
 
 - [ ] Fresh install → welcome/onboarding
-- [ ] Upgrade from previous install → data loads (or recovery if corrupt)
+- [ ] Upgrade from a v3 (0.1.x) install → data migrates to schema v4; friends/plans intact
 - [ ] Add friend manually
+- [ ] Make a plan with **zero** availability (When + → Make a plan, or Invite from profile)
+- [ ] Months view: dots for 1 / 2 / 3+ friends seen; upcoming hollow ring; day sheet; scroll ~12 months; Today chip
+- [ ] Catch-up reminder series: due friend → up to 4 weekly 11:00 nudges (dev check via scheduled notifications or Settings)
+- [ ] Add to calendar → OS create-event UI; move plan → stale hint (Add again / Dismiss); cancel → cancelled hint
+- [ ] Settings → Send feedback opens mailto
 - [ ] Gallery friend photo + plan memory photo survive **relaunch**
 - [ ] Process death (force-stop) → state restored from primary/backup
 - [ ] Invitation share sheet; edit text; Yes/Maybe/No preserved when dismissing send confirm
-- [ ] JSON export share and **cancel** (temp file cleaned)
+- [ ] JSON export share and **cancel** (temp file cleaned); export includes `catchUps`
 - [ ] Local reminders (permission on/off, settings toggles)
 - [ ] Forced save failure → banner Retry resaves latest (does not wipe)
 - [ ] Wipe all data → empty welcome; Retry wipe if wipe failed (does not resave old snapshot)
