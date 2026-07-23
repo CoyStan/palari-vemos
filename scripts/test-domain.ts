@@ -17,6 +17,7 @@ import {
   createPlanState,
   lookAroundFirst,
   markPlanDoneState,
+  logCaughtUpState,
   skipOccurrenceOnce,
   updateSettings,
 } from "../src/domain/mutations";
@@ -124,6 +125,7 @@ const plan710: Plan = {
   cancelledAt: null,
   createdAt: now.toISOString(),
   updatedAt: now.toISOString(),
+  calendarExport: null,
 };
 
 const slot89: ConcreteSlot = {
@@ -391,5 +393,167 @@ assert.equal(dayMarkSize(1), "small");
 assert.equal(dayMarkSize(2), "medium");
 assert.equal(dayMarkSize(3), "large");
 assert.equal(dayMarkSize(7), "large");
+
+// Schema v4: migrate v3 → catchUps + calendarExport (docs/V1_CONTRACT.md WP2).
+const v3Payload = JSON.stringify({
+  schemaVersion: 3,
+  onboardingComplete: true,
+  friends: [
+    { id: "f1", name: "Ana", rhythm: "monthly", createdAt: now.toISOString() },
+  ],
+  availability: [],
+  skipped: [],
+  plans: [
+    {
+      id: "p-v3",
+      title: "Coffee",
+      startAt: new Date(2026, 6, 23, 19, 0).toISOString(),
+      endAt: new Date(2026, 6, 23, 20, 0).toISOString(),
+      friends: [
+        {
+          friendId: "f1",
+          status: "yes",
+          invitationText: "hi",
+          inviteTone: "warm",
+          invitationCustomized: false,
+          sentAt: null,
+          displayNameSnapshot: "Ana",
+        },
+      ],
+      status: "on",
+      attendedFriendIds: [],
+      memoryNote: "",
+      memoryPhotoUri: null,
+      completedAt: null,
+      cancelledAt: null,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    },
+  ],
+  settings: {},
+});
+const v3Migrated = migrateAndValidate(v3Payload);
+assert.equal(v3Migrated.ok, true);
+if (v3Migrated.ok) {
+  assert.equal(v3Migrated.data.schemaVersion, SCHEMA_VERSION);
+  assert.deepEqual(v3Migrated.data.catchUps, []);
+  assert.equal(v3Migrated.data.plans[0]?.calendarExport, null);
+}
+
+const malformedCatchUps = migrateAndValidate(
+  JSON.stringify({
+    schemaVersion: SCHEMA_VERSION,
+    onboardingComplete: true,
+    friends: [
+      {
+        id: "f1",
+        name: "Ana",
+        rhythm: "monthly",
+        createdAt: now.toISOString(),
+      },
+    ],
+    availability: [],
+    skipped: [],
+    plans: [],
+    catchUps: [
+      {
+        id: "ok",
+        friendId: "f1",
+        date: "2026-07-18",
+        createdAt: now.toISOString(),
+      },
+      {
+        id: "bad-date",
+        friendId: "f1",
+        date: "not-a-day",
+        createdAt: now.toISOString(),
+      },
+      { friendId: "f1", date: "2026-07-19" },
+      {
+        id: "gone-friend",
+        friendId: "missing",
+        date: "2026-07-18",
+        createdAt: now.toISOString(),
+      },
+    ],
+    settings: {},
+  }),
+);
+assert.equal(malformedCatchUps.ok, true);
+if (malformedCatchUps.ok) {
+  assert.equal(malformedCatchUps.data.catchUps.length, 1);
+  assert.equal(malformedCatchUps.data.catchUps[0]?.id, "ok");
+  assert.ok(malformedCatchUps.warnings.length >= 1);
+}
+
+const malformedExport = migrateAndValidate(
+  JSON.stringify({
+    schemaVersion: SCHEMA_VERSION,
+    onboardingComplete: true,
+    friends: [
+      {
+        id: "f1",
+        name: "Ana",
+        rhythm: "monthly",
+        createdAt: now.toISOString(),
+      },
+    ],
+    availability: [],
+    skipped: [],
+    plans: [
+      {
+        ...JSON.parse(v3Payload).plans[0],
+        id: "p-bad-export",
+        calendarExport: { exportedAt: "nope", startAt: "x", endAt: "y" },
+      },
+      {
+        ...JSON.parse(v3Payload).plans[0],
+        id: "p-good-export",
+        calendarExport: {
+          exportedAt: now.toISOString(),
+          startAt: new Date(2026, 6, 23, 19, 0).toISOString(),
+          endAt: new Date(2026, 6, 23, 20, 0).toISOString(),
+        },
+      },
+    ],
+    catchUps: [],
+    settings: {},
+  }),
+);
+assert.equal(malformedExport.ok, true);
+if (malformedExport.ok) {
+  assert.equal(
+    malformedExport.data.plans.find((p) => p.id === "p-bad-export")
+      ?.calendarExport,
+    null,
+  );
+  assert.ok(
+    malformedExport.data.plans.find((p) => p.id === "p-good-export")
+      ?.calendarExport,
+  );
+}
+
+let catchUpData: AppData = {
+  ...emptyAppData(),
+  friends: [friend({ id: "a", name: "Ana" })],
+};
+const whenIso = startOfDay(new Date(2026, 6, 18)).toISOString();
+catchUpData = logCaughtUpState(catchUpData, "a", whenIso, () => "catchup_1");
+catchUpData = logCaughtUpState(catchUpData, "a", whenIso, () => "catchup_2");
+assert.equal(catchUpData.catchUps.length, 1);
+assert.equal(catchUpData.catchUps[0]?.id, "catchup_1");
+assert.equal(catchUpData.friends[0]?.lastMetAt, whenIso);
+
+const doneOnly = markPlanDoneState(
+  {
+    ...emptyAppData(),
+    friends: [friend({ id: "a", name: "Ana" })],
+    plans: [{ ...plan710, friends: [planFriend("a", "yes")] }],
+  },
+  "p1",
+  ["a"],
+);
+assert.equal(doneOnly.catchUps.length, 0);
+assert.equal(doneOnly.friends[0]?.lastMetAt, plan710.startAt);
 
 console.log("all tests: ok");

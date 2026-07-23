@@ -67,6 +67,13 @@ export type PlanFriend = {
   displayNameSnapshot: string | null;
 };
 
+/** Snapshot of what was handed to the OS calendar create-event UI (WP6). */
+export type PlanCalendarExport = {
+  exportedAt: string;
+  startAt: string;
+  endAt: string;
+};
+
 export type Plan = {
   id: string;
   title: string;
@@ -87,6 +94,17 @@ export type Plan = {
   cancelledAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Last OS calendar handoff; null until the user adds the plan to a calendar. */
+  calendarExport: PlanCalendarExport | null;
+};
+
+/** Manual “we caught up” log for Months-view history (one per friend per day). */
+export type CatchUpLog = {
+  id: string;
+  friendId: string;
+  /** YYYY-MM-DD — local day the catch-up happened. */
+  date: string;
+  createdAt: string;
 };
 
 export type AppSettings = {
@@ -115,6 +133,8 @@ export type AppData = {
   availability: AvailabilityRule[];
   skipped: SkippedOccurrence[];
   plans: Plan[];
+  /** Manual catch-up history; done-plan attendance is derived separately. */
+  catchUps: CatchUpLog[];
   settings: AppSettings;
 };
 

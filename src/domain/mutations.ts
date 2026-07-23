@@ -5,10 +5,12 @@ import {
   proposePlanWindow,
   slotConflictsWithPlans,
 } from "./model";
+import { formatDateKey } from "./time";
 import type {
   AppData,
   AppSettings,
   AvailabilityRule,
+  CatchUpLog,
   CatchUpRhythm,
   ConcreteSlot,
   Friend,
@@ -379,6 +381,7 @@ export function createPlanState(
     cancelledAt: null,
     createdAt: now,
     updatedAt: now,
+    calendarExport: null,
   };
 
   return {
@@ -500,6 +503,45 @@ export function markPlanDoneState(
             updatedAt: now,
           }
         : item,
+    ),
+  };
+}
+
+/**
+ * Record a manual catch-up. Updates lastMetAt and appends an idempotent
+ * catchUps row (same friendId + local date → no duplicate). Does not run
+ * when a plan is marked Done — attendance is derived at read time.
+ */
+export function logCaughtUpState(
+  data: AppData,
+  friendId: string,
+  whenIso: string,
+  createId: (prefix: string) => string = (prefix) =>
+    `${prefix}_${Date.now().toString(36)}`,
+): AppData {
+  if (!data.friends.some((friend) => friend.id === friendId)) {
+    return data;
+  }
+  const date = formatDateKey(new Date(whenIso));
+  const alreadyLogged = data.catchUps.some(
+    (log) => log.friendId === friendId && log.date === date,
+  );
+  const catchUps: CatchUpLog[] = alreadyLogged
+    ? data.catchUps
+    : [
+        ...data.catchUps,
+        {
+          id: createId("catchup"),
+          friendId,
+          date,
+          createdAt: new Date().toISOString(),
+        },
+      ];
+  return {
+    ...data,
+    catchUps,
+    friends: data.friends.map((friend) =>
+      friend.id === friendId ? { ...friend, lastMetAt: whenIso } : friend,
     ),
   };
 }
@@ -637,6 +679,7 @@ export function moveFriendToSlotState(
     cancelledAt: null,
     createdAt: nowIso,
     updatedAt: nowIso,
+    calendarExport: null,
   };
 
   return {

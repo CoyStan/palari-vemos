@@ -27,6 +27,8 @@ import {
 } from "../src/persistence/migrate";
 import {
   BACKUP_KEY,
+  clearAppData,
+  exportAppDataJson,
   loadAppData,
   saveAppData,
   STORAGE_KEY,
@@ -91,6 +93,7 @@ function basePlan(partial: Partial<Plan> & Pick<Plan, "id">): Plan {
     cancelledAt: null,
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
+    calendarExport: null,
     ...partial,
   };
 }
@@ -126,6 +129,7 @@ function validPayload(overrides: Record<string, unknown> = {}): string {
     availability: [],
     skipped: [],
     plans: [],
+    catchUps: [],
     settings: {},
     ...overrides,
   });
@@ -855,6 +859,35 @@ async function main() {
     assert.ok(mid >= 1);
     await coord2.schedule(enabled, 3); // older
     assert.equal(io2.scheduled.length, mid);
+  }
+
+  // --- schema v4 export includes catchUps; wipe clears it ---
+  {
+    const withCatchUps: AppData = {
+      ...emptyAppData(),
+      onboardingComplete: true,
+      friends: [friend({ id: "a", name: "Ana" })],
+      catchUps: [
+        {
+          id: "c1",
+          friendId: "a",
+          date: "2026-07-18",
+          createdAt: now.toISOString(),
+        },
+      ],
+    };
+    const json = await exportAppDataJson(withCatchUps);
+    const parsed = JSON.parse(json) as AppData;
+    assert.equal(parsed.schemaVersion, SCHEMA_VERSION);
+    assert.equal(parsed.catchUps.length, 1);
+
+    const adapter = memoryAdapter({
+      [STORAGE_KEY]: json,
+      [BACKUP_KEY]: json,
+    });
+    await clearAppData(adapter);
+    assert.equal(adapter.store.get(STORAGE_KEY), undefined);
+    assert.equal(adapter.store.get(BACKUP_KEY), undefined);
   }
 
   console.log("hardening tests: ok");

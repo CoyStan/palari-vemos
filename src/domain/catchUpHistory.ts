@@ -1,19 +1,7 @@
 import { formatDateKey } from "./time";
-import type { Plan } from "./types";
+import type { CatchUpLog, Plan } from "./types";
 
-/**
- * Seed module for the Months view (docs/V1_CONTRACT.md WP2/WP4).
- * WP2 moves CatchUpLog into src/domain/types.ts and adds
- * `catchUps: CatchUpLog[]` to AppData; defined here first so this module
- * compiles and is tested before the schema change lands.
- */
-export type CatchUpLog = {
-  id: string;
-  friendId: string;
-  /** YYYY-MM-DD — local day the catch-up happened. */
-  date: string;
-  createdAt: string;
-};
+export type { CatchUpLog } from "./types";
 
 /** One calendar day of catch-up history, aggregated for the Months view. */
 export type DayMark = {

@@ -19,6 +19,7 @@ import {
   markInviteSentState,
   markPlanCancelledState,
   markPlanDoneState,
+  logCaughtUpState,
   moveFriendToSlotState,
   plansAffectedByFriendDeletion,
   removeFriend,
@@ -1065,12 +1066,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const logCaughtUp = useCallback(
     async (friendId: string, whenIso: string) => {
-      await commit((current) => ({
-        ...current,
-        friends: current.friends.map((friend) =>
-          friend.id === friendId ? { ...friend, lastMetAt: whenIso } : friend,
-        ),
-      }));
+      await commit((current) =>
+        logCaughtUpState(current, friendId, whenIso, createId),
+      );
     },
     [commit],
   );
