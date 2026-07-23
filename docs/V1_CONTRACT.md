@@ -131,13 +131,13 @@ remember what was exported to detect stale copies. One schema bump covers both.
 
 **Acceptance.**
 
-- [ ] `SCHEMA_VERSION` is 4; loading a v3 payload migrates cleanly (test it).
-- [ ] `scripts/test-domain.ts` + `scripts/test-hardening.ts`: audit for
+- [x] `SCHEMA_VERSION` is 4; loading a v3 payload migrates cleanly (test it).
+- [x] `scripts/test-domain.ts` + `scripts/test-hardening.ts`: audit for
       hardcoded schema versions (e.g. "future schema" fixtures) and keep them
       relative to `SCHEMA_VERSION` where possible; add cases: v3→v4 migration,
       malformed `catchUps` entries dropped, malformed `calendarExport`
       nulled, `logCaughtUp` idempotency (same friend+day twice → one entry).
-- [ ] JSON export contains `catchUps`; wipe clears it.
+- [x] JSON export contains `catchUps`; wipe clears it.
 
 ## WP3 — "Make a plan" without availability (core-loop fix)
 
@@ -410,3 +410,10 @@ render path found in evaluation.
   `tools:node="remove"` as clean.
 - Kept media `kind` as `"friend" | "memory"` only (dropped unused `"contact"`).
 - `.cursor/rules/vemos.mdc` updated to match AGENTS.md (no contact picker).
+
+### WP2
+- Added `logCaughtUpState` in `mutations.ts` (idempotent append) so AppProvider
+  and tests share one path; plan Done still does not write `catchUps`.
+- `currentSchemaShapeInvalid` only rejects non-array `catchUps` when
+  `schemaVersion >= 4` and the field is present; missing `catchUps` on v3
+  payloads defaults to `[]`.
