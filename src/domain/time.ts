@@ -32,6 +32,21 @@ export const MONTH_LABELS_SHORT = [
   "Dec",
 ] as const;
 
+export const MONTH_LABELS_LONG = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+
 /** Visible calendar hours (inclusive start, exclusive end for grid rows). */
 export const DAY_START_HOUR = 7;
 export const DAY_END_HOUR = 22;

@@ -171,9 +171,7 @@ function parseSettings(value: unknown): AppSettings {
     defaultDurationMinutes: [30, 60, 90, 120, 180].includes(duration)
       ? duration
       : base.defaultDurationMinutes,
-    firstDayOfWeek: clampDay(
-      asNumber(value.firstDayOfWeek, base.firstDayOfWeek),
-    ),
+    firstDayOfWeek: 0, // Sunday — Week & Months calendars (no settings picker yet)
     timeFormat24h: asBool(value.timeFormat24h, base.timeFormat24h),
     calendarDayStartHour: start,
     calendarDayEndHour: end,

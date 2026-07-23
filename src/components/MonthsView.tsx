@@ -1,12 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import {
-  FlatList,
-  Image,
-  Pressable,
-  Text,
-  View,
-  type ListRenderItemInfo,
-} from "react-native";
+import { Image, Pressable, ScrollView, Text, View } from "react-native";
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -38,18 +31,35 @@ import { cn } from "../ui/cn";
 import { useReduceMotion } from "../ui/useReduceMotion";
 
 const DAY_CELL_SIZE = 44;
-const GRID_ROWS = 6;
 const MONTH_TITLE_HEIGHT = 44;
 const WEEKDAY_HEADER_HEIGHT = 28;
 const MONTH_FOOTER_HEIGHT = 36;
-const MONTH_BOTTOM_GAP = 20;
+const MONTH_CARD_PADDING = 16;
+const MONTH_BOTTOM_GAP = 16;
 
-export const MONTH_ROW_HEIGHT =
-  MONTH_TITLE_HEIGHT +
-  WEEKDAY_HEADER_HEIGHT +
-  GRID_ROWS * DAY_CELL_SIZE +
-  MONTH_FOOTER_HEIGHT +
-  MONTH_BOTTOM_GAP;
+function daysInMonth(monthStart: Date): number {
+  return new Date(
+    monthStart.getFullYear(),
+    monthStart.getMonth() + 1,
+    0,
+  ).getDate();
+}
+
+function weekRowsForMonth(monthStart: Date, firstDayOfWeek: number): number {
+  const leadingBlanks = (monthStart.getDay() - firstDayOfWeek + 7) % 7;
+  return Math.ceil((leadingBlanks + daysInMonth(monthStart)) / 7);
+}
+
+function monthRowHeight(weekRows: number): number {
+  return (
+    MONTH_CARD_PADDING * 2 +
+    MONTH_TITLE_HEIGHT +
+    WEEKDAY_HEADER_HEIGHT +
+    weekRows * DAY_CELL_SIZE +
+    MONTH_FOOTER_HEIGHT +
+    MONTH_BOTTOM_GAP
+  );
+}
 
 type Props = {
   plans: Plan[];
@@ -109,14 +119,6 @@ function buildMonthRange(
 
 function weekdayOrder(firstDayOfWeek: number): number[] {
   return Array.from({ length: 7 }, (_, i) => (firstDayOfWeek + i) % 7);
-}
-
-function daysInMonth(monthStart: Date): number {
-  return new Date(
-    monthStart.getFullYear(),
-    monthStart.getMonth() + 1,
-    0,
-  ).getDate();
 }
 
 function countDaysWithFriends(
@@ -223,6 +225,7 @@ function MonthGrid({
   const month = monthStart.getMonth();
   const totalDays = daysInMonth(monthStart);
   const leadingBlanks = (monthStart.getDay() - firstDayOfWeek + 7) % 7;
+  const weekRows = weekRowsForMonth(monthStart, firstDayOfWeek);
 
   const cells: Array<{ day: number | null; dateKey: string | null }> = [];
   for (let i = 0; i < leadingBlanks; i += 1) {
@@ -234,11 +237,11 @@ function MonthGrid({
       dateKey: `${year}-${pad2(month + 1)}-${pad2(day)}`,
     });
   }
-  while (cells.length < GRID_ROWS * 7) {
+  while (cells.length < weekRows * 7) {
     cells.push({ day: null, dateKey: null });
   }
 
-  const rows = Array.from({ length: GRID_ROWS }, (_, rowIndex) =>
+  const rows = Array.from({ length: weekRows }, (_, rowIndex) =>
     cells.slice(rowIndex * 7, rowIndex * 7 + 7),
   );
 
@@ -332,26 +335,35 @@ function MonthRow({
     friendDays === 1 ? "1 day with friends" : `${friendDays} days with friends`;
 
   return (
-    <View style={{ height: MONTH_ROW_HEIGHT }}>
-      <Text
-        className="font-sans-bold text-section text-ink"
-        style={{ height: MONTH_TITLE_HEIGHT, lineHeight: MONTH_TITLE_HEIGHT }}
+    <View style={{ marginBottom: MONTH_BOTTOM_GAP }}>
+      <Card
+        className="gap-1 overflow-hidden"
+        elevation="soft"
+        style={{ padding: 16 }}
       >
-        {formatMonthHeading(item.monthStart)}
-      </Text>
-      <MonthGrid
-        monthStart={item.monthStart}
-        dayMarks={dayMarks}
-        firstDayOfWeek={firstDayOfWeek}
-        todayKey={todayKey}
-        onDayPress={onDayPress}
-      />
-      <Text
-        className="text-caption text-muted"
-        style={{ height: MONTH_FOOTER_HEIGHT, lineHeight: MONTH_FOOTER_HEIGHT }}
-      >
-        {footerLabel}
-      </Text>
+        <Text
+          className="font-sans-bold text-[22px] tracking-[-0.5px] text-ink"
+          style={{ height: MONTH_TITLE_HEIGHT, lineHeight: MONTH_TITLE_HEIGHT }}
+        >
+          {formatMonthHeading(item.monthStart)}
+        </Text>
+        <MonthGrid
+          monthStart={item.monthStart}
+          dayMarks={dayMarks}
+          firstDayOfWeek={firstDayOfWeek}
+          todayKey={todayKey}
+          onDayPress={onDayPress}
+        />
+        <Text
+          className="text-caption text-muted"
+          style={{
+            height: MONTH_FOOTER_HEIGHT,
+            lineHeight: MONTH_FOOTER_HEIGHT,
+          }}
+        >
+          {footerLabel}
+        </Text>
+      </Card>
     </View>
   );
 }
@@ -487,7 +499,7 @@ export function MonthsView({
     (item) => item.key === currentMonthKey,
   );
 
-  const listRef = useRef<FlatList<MonthItem>>(null);
+  const listRef = useRef<ScrollView>(null);
   const [sheetDateKey, setSheetDateKey] = useState<string | null>(null);
   const reduceMotion = useReduceMotion();
   const enterProgress = useSharedValue(reduceMotion ? 1 : 0);
@@ -500,28 +512,40 @@ export function MonthsView({
     });
   }, [enterProgress, reduceMotion]);
 
+  const offsetForMonthIndex = (index: number) => {
+    let y = 0;
+    for (let i = 0; i < index; i += 1) {
+      const item = months[i];
+      if (!item) {
+        continue;
+      }
+      y += monthRowHeight(weekRowsForMonth(item.monthStart, firstDayOfWeek));
+    }
+    return y;
+  };
+
   useEffect(() => {
     if (currentMonthIndex < 0) {
       return;
     }
     const timer = setTimeout(() => {
-      listRef.current?.scrollToIndex({
-        index: currentMonthIndex,
+      listRef.current?.scrollTo({
+        y: offsetForMonthIndex(currentMonthIndex),
         animated: false,
       });
     }, 50);
     return () => clearTimeout(timer);
-  }, [currentMonthIndex]);
+  }, [currentMonthIndex, firstDayOfWeek, months]);
 
+  // Opacity only — avoid transform on the scroll parent (breaks wheel scroll on web).
   const enterStyle = useAnimatedStyle(() => ({
     opacity: enterProgress.value,
-    transform: [{ translateY: (1 - enterProgress.value) * 12 }],
   }));
 
   const scrollToToday = () => {
     if (currentMonthIndex >= 0) {
-      listRef.current?.scrollToIndex({
-        index: currentMonthIndex,
+      listRef.current?.scrollTo({
+        y: offsetForMonthIndex(currentMonthIndex),
         animated: true,
       });
     }
@@ -548,18 +572,8 @@ export function MonthsView({
     );
   }
 
-  const renderItem = ({ item }: ListRenderItemInfo<MonthItem>) => (
-    <MonthRow
-      item={item}
-      dayMarks={dayMarks}
-      firstDayOfWeek={firstDayOfWeek}
-      todayKey={todayKey}
-      onDayPress={onDayPress}
-    />
-  );
-
   return (
-    <Animated.View className="flex-1" style={enterStyle}>
+    <Animated.View style={[{ flex: 1, minHeight: 0 }, enterStyle]}>
       <View className="mb-3 flex-row items-center">
         <Pressable
           accessibilityRole="button"
@@ -574,31 +588,24 @@ export function MonthsView({
         </Pressable>
       </View>
 
-      <FlatList
+      <ScrollView
         ref={listRef}
-        data={months}
-        keyExtractor={(item) => item.key}
-        renderItem={renderItem}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 24 }}
-        getItemLayout={(_, index) => ({
-          length: MONTH_ROW_HEIGHT,
-          offset: MONTH_ROW_HEIGHT * index,
-          index,
-        })}
-        onScrollToIndexFailed={(info) => {
-          listRef.current?.scrollToOffset({
-            offset: info.averageItemLength * info.index,
-            animated: false,
-          });
-          setTimeout(() => {
-            listRef.current?.scrollToIndex({
-              index: info.index,
-              animated: false,
-            });
-          }, 100);
-        }}
-      />
+        style={{ flex: 1, minHeight: 0 }}
+        contentContainerStyle={{ paddingBottom: 32 }}
+        showsVerticalScrollIndicator
+        keyboardShouldPersistTaps="handled"
+      >
+        {months.map((item) => (
+          <MonthRow
+            key={item.key}
+            item={item}
+            dayMarks={dayMarks}
+            firstDayOfWeek={firstDayOfWeek}
+            todayKey={todayKey}
+            onDayPress={onDayPress}
+          />
+        ))}
+      </ScrollView>
 
       <AnimatedDialog
         visible={sheetDateKey !== null && sheetMark !== undefined}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Fragment } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -22,9 +22,11 @@ import {
 } from "../domain/model";
 import {
   addDays,
+  DAY_LABELS,
   formatDateKey,
   formatDayHeading,
   formatWeekTitle,
+  MONTH_LABELS_LONG,
   MONTH_LABELS_SHORT,
   startOfDay,
   startOfWeek,
@@ -54,7 +56,6 @@ export function WhenScreen() {
     openCreatePlan,
     openMakePlan,
     openPlanDetail,
-    openPastPlans,
     openAddFriend,
     openFriendProfile,
     skipOccurrence,
@@ -186,8 +187,9 @@ export function WhenScreen() {
       >
         <View className="mb-4 flex-row items-end justify-between gap-3">
           <View className="flex-1">
-            <Text className="font-sans-bold text-[28px] tracking-[-1px] text-primary">
-              So, when?
+            <Text className="font-sans-bold text-[34px] tracking-[-1.2px]">
+              <Text className="text-primary">So, </Text>
+              <Text className="text-ink">when?</Text>
             </Text>
             <Text className="text-caption text-muted">
               {greeting()} ·{" "}
@@ -273,17 +275,6 @@ export function WhenScreen() {
             );
           })}
         </View>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Past plans"
-          onPress={openPastPlans}
-          className="mb-3 min-h-[44px] justify-center self-start px-1"
-        >
-          <Text className="font-sans-semibold text-caption text-primary">
-            Past plans
-          </Text>
-        </Pressable>
 
         {mode === "week" ? (
           <View className="mb-3 flex-row items-center gap-2">
@@ -378,172 +369,246 @@ export function WhenScreen() {
               </Card>
             ) : null}
 
-            {timeline.map((item) => {
-              if (item.type === "catch_up") {
-                return (
-                  <PressableScale
-                    key={`catch-${item.friend.id}`}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${item.friend.name}, catch-up suggestion`}
-                    onPress={() => openFriendProfile(item.friend.id)}
+            {(() => {
+              let lastMonthKey: string | null = null;
+              return timeline.map((item) => {
+                const itemDate = new Date(item.sortAt);
+                const monthKey = `${itemDate.getFullYear()}-${itemDate.getMonth()}`;
+                const showMonthHeader = monthKey !== lastMonthKey;
+                const isFirstMonthSection =
+                  showMonthHeader && lastMonthKey === null;
+                lastMonthKey = monthKey;
+                const monthTitle =
+                  MONTH_LABELS_LONG[itemDate.getMonth()] ??
+                  MONTH_LABELS_SHORT[itemDate.getMonth()] ??
+                  "";
+
+                const monthHeader = showMonthHeader ? (
+                  <Text
+                    className={cn(
+                      "mb-1 font-sans-bold text-[28px] leading-8 tracking-[-1px] text-ink",
+                      !isFirstMonthSection && "mt-3",
+                    )}
                   >
-                    <View className="flex-row items-center gap-3 rounded-card bg-coral-soft p-4">
-                      <Avatar
-                        name={item.friend.name}
-                        photoUri={item.friend.photoUri}
-                        size={48}
-                      />
-                      <View className="flex-1">
-                        <Text className="font-sans-bold text-body text-ink">
-                          Want to invite {item.friend.name}?
-                        </Text>
-                        <Text className="text-caption text-coral-deep">
-                          {lastMetLabel(item.friend.lastMetAt)}
-                        </Text>
+                    {monthTitle}
+                  </Text>
+                ) : null;
+
+                if (item.type === "catch_up") {
+                  return (
+                    <Fragment key={`catch-${item.friend.id}`}>
+                      {monthHeader}
+                      <PressableScale
+                        accessibilityRole="button"
+                        accessibilityLabel={`${item.friend.name}, catch-up suggestion`}
+                        onPress={() => openFriendProfile(item.friend.id)}
+                      >
+                        <View className="flex-row items-center gap-3 rounded-card bg-coral-soft p-4">
+                          <Avatar
+                            name={item.friend.name}
+                            photoUri={item.friend.photoUri}
+                            size={48}
+                          />
+                          <View className="flex-1">
+                            <Text className="font-sans-bold text-body text-ink">
+                              Want to invite {item.friend.name}?
+                            </Text>
+                            <Text className="text-caption text-coral-deep">
+                              {lastMetLabel(item.friend.lastMetAt)}
+                            </Text>
+                          </View>
+                          <Icon
+                            name="chevron-right"
+                            size={20}
+                            color={color.coralDeep}
+                          />
+                        </View>
+                      </PressableScale>
+                    </Fragment>
+                  );
+                }
+
+                if (item.type === "did_it_happen") {
+                  const plan = item.plan;
+                  const start = new Date(plan.startAt);
+                  const weekday = DAY_LABELS[start.getDay()] ?? "";
+                  return (
+                    <Fragment key={`ask-${plan.id}`}>
+                      {monthHeader}
+                      <PressableScale
+                        accessibilityRole="button"
+                        accessibilityLabel={`Did ${plan.title} happen?`}
+                        onPress={() => openPlanDetail(plan.id)}
+                      >
+                        <Card
+                          className="flex-row items-stretch overflow-hidden"
+                          style={{ padding: 0 }}
+                        >
+                          <View
+                            className="items-center justify-center px-2 py-4"
+                            style={{
+                              width: "25%",
+                              borderRightWidth: 1,
+                              borderRightColor: color.border,
+                            }}
+                          >
+                            <Text className="text-center text-caption font-sans-semibold uppercase tracking-[0.4px] text-muted">
+                              {weekday}
+                            </Text>
+                            <Text className="mt-1 text-center font-sans-bold text-[28px] leading-8 tracking-[-1px] text-ink">
+                              {start.getDate()}
+                            </Text>
+                          </View>
+                          <View className="flex-1 justify-center gap-1 px-4 py-4">
+                            <Text className="font-sans-semibold text-caption text-muted">
+                              Did this happen?
+                            </Text>
+                            <Text className="font-sans-bold text-section text-ink">
+                              {plan.title}
+                            </Text>
+                          </View>
+                        </Card>
+                      </PressableScale>
+                    </Fragment>
+                  );
+                }
+
+                if (item.type === "availability") {
+                  const start = new Date(item.slot.startAt);
+                  const weekday = DAY_LABELS[start.getDay()] ?? "";
+                  return (
+                    <Fragment key={item.slot.key}>
+                      {monthHeader}
+                      <View className="relative rounded-card bg-primary-soft">
+                        <PressableScale
+                          accessibilityRole="button"
+                          accessibilityLabel={`Free ${formatDayHeading(start)}, tap to make a plan`}
+                          onPress={() => openProposedSlot(item.slot)}
+                          className="flex-row items-stretch"
+                        >
+                          <View
+                            className="items-center justify-center px-2 py-4"
+                            style={{
+                              width: "25%",
+                              borderRightWidth: 1,
+                              borderRightColor: color.softTealBorder,
+                            }}
+                          >
+                            <Text className="text-center text-caption font-sans-semibold uppercase tracking-[0.4px] text-primary">
+                              {weekday}
+                            </Text>
+                            <Text className="mt-1 text-center font-sans-bold text-[28px] leading-8 tracking-[-1px] text-ink">
+                              {start.getDate()}
+                            </Text>
+                          </View>
+                          <View className="flex-1 justify-center gap-1 px-4 py-4 pr-12">
+                            <Text className="font-sans-bold text-section leading-6 text-ink">
+                              {formatClock(
+                                item.slot.startMinutes,
+                                data.settings.timeFormat24h,
+                              )}
+                              {" – "}
+                              {formatClock(
+                                item.slot.endMinutes,
+                                data.settings.timeFormat24h,
+                              )}
+                            </Text>
+                            <Text className="mt-1 text-body leading-5 text-primary">
+                              You’re free
+                            </Text>
+                            <Text className="text-body leading-5 text-primary">
+                              Tap to plan something
+                            </Text>
+                          </View>
+                        </PressableScale>
+                        {item.slot.ruleId ? (
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={`Skip free time on ${formatDayHeading(start)}`}
+                            hitSlop={4}
+                            onPress={() => onRequestSkip(item.slot)}
+                            className="absolute right-0.5 top-0.5 z-20 h-11 w-11 items-center justify-center"
+                          >
+                            <Icon name="x" size={16} color={color.primary} />
+                          </Pressable>
+                        ) : null}
                       </View>
-                      <Icon
-                        name="chevron-right"
-                        size={20}
-                        color={color.coralDeep}
-                      />
-                    </View>
-                  </PressableScale>
-                );
-              }
+                    </Fragment>
+                  );
+                }
 
-              if (item.type === "did_it_happen") {
                 const plan = item.plan;
-                return (
-                  <PressableScale
-                    key={`ask-${plan.id}`}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Did ${plan.title} happen?`}
-                    onPress={() => openPlanDetail(plan.id)}
-                  >
-                    <Card className="gap-1 p-4">
-                      <Text className="font-sans-semibold text-caption text-muted">
-                        Did this happen?
-                      </Text>
-                      <Text className="font-sans-bold text-section text-ink">
-                        {plan.title}
-                      </Text>
-                    </Card>
-                  </PressableScale>
+                const start = new Date(plan.startAt);
+                const end = new Date(plan.endAt);
+                const startMin = start.getHours() * 60 + start.getMinutes();
+                const endMin = end.getHours() * 60 + end.getMinutes();
+                const activeFriends = plan.friends.filter(
+                  (f) => f.status !== "moved",
                 );
-              }
+                const yes = activeFriends.filter(
+                  (f) => f.status === "yes",
+                ).length;
+                const waiting = activeFriends.filter(
+                  (f) => f.status === "waiting" || f.status === "maybe",
+                ).length;
+                const names = activeFriends
+                  .map(
+                    (f) =>
+                      data.friends.find((friend) => friend.id === f.friendId)
+                        ?.name ?? f.displayNameSnapshot,
+                  )
+                  .filter(Boolean)
+                  .join(", ");
 
-              if (item.type === "availability") {
-                const start = new Date(item.slot.startAt);
                 return (
-                  <View key={item.slot.key} className="gap-2">
+                  <Fragment key={plan.id}>
+                    {monthHeader}
                     <PressableScale
                       accessibilityRole="button"
-                      accessibilityLabel={`Free ${formatDayHeading(start)}, tap to make a plan`}
-                      onPress={() => openProposedSlot(item.slot)}
+                      accessibilityLabel={`${plan.title}, ${PLAN_STATUS_LABELS[plan.status]}`}
+                      onPress={() => openPlanDetail(plan.id)}
                     >
-                      <View className="rounded-card bg-primary-soft p-4">
-                        <Text className="font-sans-semibold text-caption text-primary">
-                          {formatDayHeading(start)}
+                      <Card elevation="lift" className="p-4">
+                        <Text className="font-sans-semibold text-caption text-muted">
+                          {DAY_LABELS[start.getDay()]} {start.getDate()} ·{" "}
+                          {formatClock(startMin, data.settings.timeFormat24h)}
+                          {" – "}
+                          {formatClock(endMin, data.settings.timeFormat24h)}
                         </Text>
                         <Text className="mt-1 font-sans-bold text-section text-ink">
-                          {formatClock(
-                            item.slot.startMinutes,
-                            data.settings.timeFormat24h,
-                          )}
-                          {" – "}
-                          {formatClock(
-                            item.slot.endMinutes,
-                            data.settings.timeFormat24h,
-                          )}
+                          {plan.title}
                         </Text>
-                        <Text className="mt-1 text-body text-primary">
-                          You’re free — tap to plan something
+                        {names ? (
+                          <Text className="mt-1 text-body text-muted">
+                            {plan.activity
+                              ? `${plan.activity} with ${names}`
+                              : names}
+                          </Text>
+                        ) : null}
+                        <Text className="mt-2 text-caption font-sans-semibold text-primary">
+                          {PLAN_STATUS_LABELS[plan.status]}
+                          {yes || waiting
+                            ? ` · ${yes} confirmed · ${waiting} waiting`
+                            : ` · ${INVITE_STATUS_LABELS.not_invited}`}
                         </Text>
-                      </View>
+                      </Card>
                     </PressableScale>
-                    {item.slot.ruleId ? (
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={`Skip free time on ${formatDayHeading(start)}`}
-                        onPress={() => onRequestSkip(item.slot)}
-                        className="min-h-[44px] items-center justify-center self-start px-2"
-                      >
-                        <Text className="font-sans-semibold text-caption text-muted">
-                          Skip this one
-                        </Text>
-                      </Pressable>
-                    ) : null}
-                  </View>
+                  </Fragment>
                 );
-              }
-
-              const plan = item.plan;
-              const start = new Date(plan.startAt);
-              const end = new Date(plan.endAt);
-              const startMin = start.getHours() * 60 + start.getMinutes();
-              const endMin = end.getHours() * 60 + end.getMinutes();
-              const activeFriends = plan.friends.filter(
-                (f) => f.status !== "moved",
-              );
-              const yes = activeFriends.filter(
-                (f) => f.status === "yes",
-              ).length;
-              const waiting = activeFriends.filter(
-                (f) => f.status === "waiting" || f.status === "maybe",
-              ).length;
-              const names = activeFriends
-                .map(
-                  (f) =>
-                    data.friends.find((friend) => friend.id === f.friendId)
-                      ?.name ?? f.displayNameSnapshot,
-                )
-                .filter(Boolean)
-                .join(", ");
-
-              return (
-                <PressableScale
-                  key={plan.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${plan.title}, ${PLAN_STATUS_LABELS[plan.status]}`}
-                  onPress={() => openPlanDetail(plan.id)}
-                >
-                  <Card elevation="lift" className="p-4">
-                    <Text className="font-sans-semibold text-caption text-muted">
-                      {formatDayHeading(start)} ·{" "}
-                      {formatClock(startMin, data.settings.timeFormat24h)}
-                      {" – "}
-                      {formatClock(endMin, data.settings.timeFormat24h)}
-                    </Text>
-                    <Text className="mt-1 font-sans-bold text-section text-ink">
-                      {plan.title}
-                    </Text>
-                    {names ? (
-                      <Text className="mt-1 text-body text-muted">
-                        {plan.activity
-                          ? `${plan.activity} with ${names}`
-                          : names}
-                      </Text>
-                    ) : null}
-                    <Text className="mt-2 text-caption font-sans-semibold text-primary">
-                      {PLAN_STATUS_LABELS[plan.status]}
-                      {yes || waiting
-                        ? ` · ${yes} confirmed · ${waiting} waiting`
-                        : ` · ${INVITE_STATUS_LABELS.not_invited}`}
-                    </Text>
-                  </Card>
-                </PressableScale>
-              );
-            })}
+              });
+            })()}
           </ScrollView>
         ) : mode === "months" ? (
-          <MonthsView
-            plans={data.plans}
-            catchUps={data.catchUps}
-            friends={data.friends}
-            firstDayOfWeek={firstDay}
-            now={now}
-            onOpenPlan={openPlanDetail}
-          />
+          <View className="min-h-0 flex-1">
+            <MonthsView
+              plans={data.plans}
+              catchUps={data.catchUps}
+              friends={data.friends}
+              firstDayOfWeek={firstDay}
+              now={now}
+              onOpenPlan={openPlanDetail}
+            />
+          </View>
         ) : (
           <View className="flex-1 gap-2">
             <Text className="text-caption text-muted">

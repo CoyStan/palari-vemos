@@ -202,37 +202,6 @@ export function SettingsScreen() {
           />
         </Section>
 
-        <Section title="Privacy & data">
-          <Text className="text-body text-muted">
-            So, When? stores friends, availability, and plans only on this
-            device. Friends do not need the app. Add friends by typing a name —
-            nothing is scanned or uploaded from your address book.
-          </Text>
-          <Button
-            label="Privacy policy"
-            variant="secondary"
-            onPress={openPrivacyPolicy}
-          />
-          <Button
-            label="Export data"
-            variant="secondary"
-            onPress={() => void onExport()}
-          />
-          <Button label="Delete all data" variant="ghost" onPress={onWipe} />
-        </Section>
-
-        <Section title="About">
-          <Text className="text-body text-muted">
-            So, When? is made by Palari Labs, Inc. Version 1 is a private
-            organizer — not a social network.
-          </Text>
-          <Button
-            label="Send feedback"
-            variant="secondary"
-            onPress={() => void onSendFeedback()}
-          />
-        </Section>
-
         <Section title="Advanced">
           <ChoiceChips
             label="Default plan duration"
@@ -283,6 +252,37 @@ export function SettingsScreen() {
             value={settings.showReminderNames}
             onValueChange={(value) => toggle("showReminderNames", value)}
             disabled={!settings.notificationsEnabled}
+          />
+        </Section>
+
+        <Section title="Privacy & data">
+          <Text className="text-body text-muted">
+            So, When? stores friends, availability, and plans only on this
+            device. Friends do not need the app. Add friends by typing a name —
+            nothing is scanned or uploaded from your address book.
+          </Text>
+          <Button
+            label="Privacy policy"
+            variant="secondary"
+            onPress={openPrivacyPolicy}
+          />
+          <Button
+            label="Export data"
+            variant="secondary"
+            onPress={() => void onExport()}
+          />
+          <Button label="Delete all data" variant="ghost" onPress={onWipe} />
+        </Section>
+
+        <Section title="About">
+          <Text className="text-body text-muted">
+            So, When? is made by Palari Labs, Inc. Version 1 is a private
+            organizer — not a social network.
+          </Text>
+          <Button
+            label="Send feedback"
+            variant="secondary"
+            onPress={() => void onSendFeedback()}
           />
         </Section>
       </ScrollView>

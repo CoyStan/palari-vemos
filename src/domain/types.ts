@@ -157,7 +157,7 @@ export const defaultSettings = (): AppSettings => ({
   notifyPlanTomorrow: true,
   notifyAskIfHappened: true,
   defaultDurationMinutes: 60,
-  firstDayOfWeek: 1,
+  firstDayOfWeek: 0,
   timeFormat24h: false,
   calendarDayStartHour: 7,
   calendarDayEndHour: 22,
