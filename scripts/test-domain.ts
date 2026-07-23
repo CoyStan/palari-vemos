@@ -299,6 +299,37 @@ if (created.ok) {
   assert.equal(done.friends[0]?.lastMetAt, created.plan.startAt);
 }
 
+// Ad-hoc plan slot (no availability rule) — WP3.
+const adhocSlot: ConcreteSlot = {
+  key: "adhoc:2026-07-25:1140",
+  ruleId: null,
+  date: "2026-07-25",
+  startMinutes: 19 * 60,
+  endMinutes: 20 * 60,
+  startAt: new Date(2026, 6, 25, 19, 0).toISOString(),
+  endAt: new Date(2026, 6, 25, 20, 0).toISOString(),
+  label: "Your pick",
+};
+const adhocCreated = createPlanState(
+  withFriend,
+  adhocSlot,
+  [withFriend.friends[0]!.id],
+  { title: "", activity: "Walk", place: "", note: "" },
+  (p) => `${p}_adhoc`,
+);
+assert.equal(adhocCreated.ok, true);
+if (adhocCreated.ok) {
+  assert.equal(adhocCreated.plan.availabilityKey, adhocSlot.key);
+  const adhocConflict = createPlanState(
+    adhocCreated.data,
+    adhocSlot,
+    [withFriend.friends[0]!.id],
+    { title: "", activity: "", place: "", note: "" },
+    (p) => `${p}_adhoc2`,
+  );
+  assert.equal(adhocConflict.ok, false);
+}
+
 const timeline = buildTimeline(
   [friend({ id: "a", name: "Ana" })],
   [

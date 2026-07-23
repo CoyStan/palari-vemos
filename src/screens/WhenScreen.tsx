@@ -52,6 +52,7 @@ export function WhenScreen() {
     spotlightPlan: todaySpotlight,
     openAddAvailability,
     openCreatePlan,
+    openMakePlan,
     openPlanDetail,
     openPastPlans,
     openAddFriend,
@@ -69,6 +70,7 @@ export function WhenScreen() {
   );
   const [sheetSlot, setSheetSlot] = useState<ConcreteSlot | null>(null);
   const [skipSlot, setSkipSlot] = useState<ConcreteSlot | null>(null);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
 
   useEffect(() => {
     setWeekStart(startOfWeek(focusDate, firstDay));
@@ -205,15 +207,12 @@ export function WhenScreen() {
           </View>
           <PressableScale
             accessibilityRole="button"
-            accessibilityLabel="Add free time"
-            onPress={openAddAvailability}
-            className="min-h-12 flex-row items-center justify-center gap-1.5 rounded-full bg-primary px-4"
+            accessibilityLabel="Add"
+            onPress={() => setAddMenuOpen(true)}
+            className="min-h-12 w-12 items-center justify-center rounded-full bg-primary"
             style={shadowSoft}
           >
-            <Icon name="plus" size={20} color="#FFFFFF" />
-            <Text className="font-sans-semibold text-caption text-white">
-              Free time
-            </Text>
+            <Icon name="plus" size={22} color="#FFFFFF" />
           </PressableScale>
         </View>
 
@@ -359,13 +358,17 @@ export function WhenScreen() {
         mode === "list" ? (
           <Card className="gap-3">
             <Text className="font-sans-bold text-section text-ink">
-              Mark when you’re free
+              Ready when you are
             </Text>
             <Text className="text-body text-muted">
-              Even an hour helps. Add free time, then tap a slot to plan with
-              someone.
+              You don’t need a schedule — pick a time and invite someone.
             </Text>
-            <Button label="Add free time" onPress={openAddAvailability} />
+            <Button label="Make a plan" onPress={() => openMakePlan()} />
+            <Button
+              label="Add free time"
+              variant="secondary"
+              onPress={openAddAvailability}
+            />
           </Card>
         ) : null}
 
@@ -552,7 +555,7 @@ export function WhenScreen() {
           <View className="flex-1 gap-2">
             <Text className="text-caption text-muted">
               {data.availability.length === 0
-                ? "Tap Free time to mark when you’re open, then tap a slot to plan."
+                ? "Tap + to make a plan or mark free time."
                 : "Tap a free slot to plan · use Skip on a slot · tap a plan to open"}
             </Text>
             <WhenCalendar
@@ -581,6 +584,38 @@ export function WhenScreen() {
         onClose={() => setSheetSlot(null)}
         onMakePlan={onMakePlan}
       />
+
+      <AnimatedDialog
+        visible={addMenuOpen}
+        onClose={() => setAddMenuOpen(false)}
+        accessibilityLabel="Add a plan or free time"
+      >
+        <View className="gap-3 px-5 pb-4">
+          <Text className="font-sans-bold text-section text-ink">
+            What would you like to add?
+          </Text>
+          <Button
+            label="Make a plan"
+            onPress={() => {
+              setAddMenuOpen(false);
+              openMakePlan();
+            }}
+          />
+          <Button
+            label="Add free time"
+            variant="secondary"
+            onPress={() => {
+              setAddMenuOpen(false);
+              openAddAvailability();
+            }}
+          />
+          <Button
+            label="Cancel"
+            variant="ghost"
+            onPress={() => setAddMenuOpen(false)}
+          />
+        </View>
+      </AnimatedDialog>
 
       <AnimatedDialog
         visible={skipSlot !== null}

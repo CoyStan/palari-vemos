@@ -175,14 +175,14 @@ label: "Your pick", ... }` and call `openCreatePlan(slot, preselectedIds)`
 
 **Acceptance.**
 
-- [ ] With **zero** availability rules and one friend, a plan can be created
+- [x] With **zero** availability rules and one friend, a plan can be created
       and shared end-to-end (unit-test `createPlanState` with a
       `ruleId: null` ad-hoc slot; manual flow check on web preview at minimum).
-- [ ] Slot suggestions and the InviteSheet flow still work unchanged.
-- [ ] Conflict rule still applies (ad-hoc slot overlapping an existing plan →
+- [x] Slot suggestions and the InviteSheet flow still work unchanged.
+- [x] Conflict rule still applies (ad-hoc slot overlapping an existing plan →
       friendly error, covered by existing `slotConflictsWithPlans`; add a test
       with an ad-hoc slot).
-- [ ] All three entry points work: When "+" dialog, empty-state card, friend
+- [x] All three entry points work: When "+" dialog, empty-state card, friend
       profile "Invite {name}".
 
 ## WP4 — Months view with catch-up dots (replaces Day view)

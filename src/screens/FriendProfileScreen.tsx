@@ -34,6 +34,7 @@ export function FriendProfileScreen() {
     openEditFriend,
     openPlanDetail,
     openCreatePlan,
+    openMakePlan,
     openAddAvailability,
     logCaughtUp,
     goBack,
@@ -177,8 +178,12 @@ export function FriendProfileScreen() {
       </View>
 
       <View className="gap-2">
+        <Button
+          label={`Invite ${friend.name}`}
+          onPress={() => openMakePlan([friend.id])}
+        />
         <Text className="font-sans-bold text-section text-ink">
-          Make a plan with {friend.name}
+          Or pick a free window
         </Text>
         {suggestions.length > 0 ? (
           suggestions.map((slot) => (
@@ -206,8 +211,8 @@ export function FriendProfileScreen() {
         ) : (
           <Card className="gap-3 p-4">
             <Text className="text-body text-muted">
-              No free windows yet. Add when you’re usually free, then come back
-              to pick a time with {friend.name}.
+              No free windows yet. You can still invite {friend.name} with Pick
+              a time, or add when you’re usually free for suggestions.
             </Text>
             <Button
               label="Add free time"

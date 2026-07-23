@@ -87,6 +87,7 @@ export type ScreenId =
   | "editAvailability"
   | "availability"
   | "createPlan"
+  | "pickPlanTime"
   | "planDetail"
   | "moveFriend"
   | "privacyPolicy"
@@ -136,7 +137,12 @@ type AppContextValue = {
   openAvailability: () => void;
   openPrivacyPolicy: () => void;
   openOnboarding: () => void;
-  openCreatePlan: (slot: ConcreteSlot, friendIds?: string[]) => void;
+  openMakePlan: (friendIds?: string[]) => void;
+  openCreatePlan: (
+    slot: ConcreteSlot,
+    friendIds?: string[],
+    options?: { replace?: boolean },
+  ) => void;
   openPlanDetail: (planId: string) => void;
   openPastPlans: () => void;
   toggleFriendSelection: (friendId: string) => void;
@@ -487,12 +493,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const openPrivacyPolicy = useCallback(() => push("privacyPolicy"), [push]);
   const openOnboarding = useCallback(() => push("onboarding"), [push]);
 
+  const openMakePlan = useCallback(
+    (friendIds?: string[]) => {
+      setSelectedFriendIds(friendIds ?? []);
+      setSelectedSlot(null);
+      push("pickPlanTime");
+    },
+    [push],
+  );
+
   const openCreatePlan = useCallback(
-    (slot: ConcreteSlot, friendIds?: string[]) => {
+    (
+      slot: ConcreteSlot,
+      friendIds?: string[],
+      options?: { replace?: boolean },
+    ) => {
+      const durationMinutes =
+        slot.ruleId === null
+          ? Math.max(30, slot.endMinutes - slot.startMinutes)
+          : dataRef.current.settings.defaultDurationMinutes;
       const window = proposePlanWindow(
         slot.startAt,
         slot.endAt,
-        dataRef.current.settings.defaultDurationMinutes,
+        durationMinutes,
       );
       setSelectedSlot({
         ...slot,
@@ -506,9 +529,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
           new Date(window.endAt).getMinutes(),
       });
       setSelectedFriendIds(friendIds ?? []);
-      push("createPlan");
+      if (options?.replace) {
+        replaceTop("createPlan");
+      } else {
+        push("createPlan");
+      }
     },
-    [push],
+    [push, replaceTop],
   );
 
   const openPlanDetail = useCallback(
@@ -1113,6 +1140,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       openAvailability,
       openPrivacyPolicy,
       openOnboarding,
+      openMakePlan,
       openCreatePlan,
       openPlanDetail,
       openPastPlans,
@@ -1188,6 +1216,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       openAvailability,
       openPrivacyPolicy,
       openOnboarding,
+      openMakePlan,
       openCreatePlan,
       openPlanDetail,
       openPastPlans,
