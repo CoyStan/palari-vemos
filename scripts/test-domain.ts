@@ -35,6 +35,11 @@ import {
 } from "../src/persistence/migrate";
 import { applyUpdaters } from "../src/persistence/writeQueue";
 import { buildReminderSpecs } from "../src/domain/reminders";
+import {
+  buildDayMarks,
+  dayMarkSize,
+  type CatchUpLog,
+} from "../src/domain/catchUpHistory";
 
 const now = new Date("2026-07-21T12:00:00.000Z");
 
@@ -333,5 +338,58 @@ const specs = buildReminderSpecs(
 );
 assert.ok(specs.length >= 1);
 assert.ok(specs.every((s) => !s.body.toLowerCase().includes("ana")));
+
+// Months view aggregation (docs/V1_CONTRACT.md WP4 seed).
+const doneJuly18: Plan = {
+  ...plan710,
+  id: "done-1",
+  startAt: new Date(2026, 6, 18, 19, 0).toISOString(),
+  endAt: new Date(2026, 6, 18, 21, 0).toISOString(),
+  status: "done",
+  friends: [planFriend("a", "yes"), planFriend("b", "yes")],
+  attendedFriendIds: ["a", "b"],
+  completedAt: new Date(2026, 6, 18, 22, 0).toISOString(),
+};
+const doneNobodyCame: Plan = {
+  ...plan710,
+  id: "done-empty",
+  startAt: new Date(2026, 6, 19, 12, 0).toISOString(),
+  endAt: new Date(2026, 6, 19, 13, 0).toISOString(),
+  status: "done",
+  attendedFriendIds: [],
+  completedAt: new Date(2026, 6, 19, 14, 0).toISOString(),
+};
+const catchUpLogs: CatchUpLog[] = [
+  {
+    id: "log-1",
+    friendId: "a",
+    date: "2026-07-18",
+    createdAt: now.toISOString(),
+  },
+  {
+    id: "log-2",
+    friendId: "c",
+    date: "2026-07-18",
+    createdAt: now.toISOString(),
+  },
+];
+const marks = buildDayMarks(
+  [doneJuly18, doneNobodyCame, { ...plan710, id: "upcoming-1" }],
+  catchUpLogs,
+);
+const july18 = marks.get("2026-07-18");
+assert.ok(july18);
+assert.deepEqual(july18.seenFriendIds, ["a", "b", "c"]);
+assert.deepEqual(july18.donePlanIds, ["done-1"]);
+assert.equal(marks.get("2026-07-19"), undefined);
+const july23 = marks.get("2026-07-23");
+assert.ok(july23);
+assert.deepEqual(july23.upcomingPlanIds, ["upcoming-1"]);
+assert.deepEqual(july23.seenFriendIds, []);
+assert.equal(dayMarkSize(0), "none");
+assert.equal(dayMarkSize(1), "small");
+assert.equal(dayMarkSize(2), "medium");
+assert.equal(dayMarkSize(3), "large");
+assert.equal(dayMarkSize(7), "large");
 
 console.log("all tests: ok");
