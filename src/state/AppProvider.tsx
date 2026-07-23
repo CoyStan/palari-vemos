@@ -72,7 +72,7 @@ import { clearOwnedMediaDirectory } from "../services/media";
 import { shareInviteMessage } from "../services/share";
 
 export type TabId = "when" | "friends" | "settings";
-export type WhenMode = "list" | "week" | "day";
+export type WhenMode = "list" | "week" | "months";
 export type ScreenId =
   | "loading"
   | "welcome"

@@ -14,11 +14,11 @@ Use **friend**, **availability**, **plan**, **invitation**, and **catch-up rhyth
 
 ## Main screens (three tabs)
 
-| Tab | Job | Primary action |
-| --- | --- | --- |
-| When | Next 2–3 weeks as a list, plus week/day calendar of free times and plans | Tap a free slot / FAB + |
-| Friends | Grid/list of people you want to see | Add by typing a name |
-| Settings | Reminders, defaults, privacy, export/wipe | Toggle quiet local reminders |
+| Tab      | Job                                                                   | Primary action               |
+| -------- | --------------------------------------------------------------------- | ---------------------------- |
+| When     | Next 2–3 weeks as a list, plus week calendar and months catch-up view | Tap a free slot / FAB +      |
+| Friends  | Grid/list of people you want to see                                   | Add by typing a name         |
+| Settings | Reminders, defaults, privacy, export/wipe                             | Toggle quiet local reminders |
 
 ## Supporting flows
 

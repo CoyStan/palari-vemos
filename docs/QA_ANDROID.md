@@ -49,7 +49,7 @@ Disable animations when automating later (`adb shell settings put global …` or
 1. **Onboarding** — welcome → add first friend + availability → land on When  
 2. **Add friend** — manual name entry; optional photo  
 3. **Availability** — recurring preset + one-time; skip occurrence; disable/delete rule  
-4. **When** — list / week / day; tap free slot → create plan  
+4. **When** — list / week / months; tap free slot or Make a plan → create plan  
 5. **Plan** — multi-friend, edit invite text, share, mark invited, per-friend status  
 6. **Follow-through** — Done / Cancelled / move friend to another slot  
 7. **Settings** — local reminders permission, calendar hours, export, wipe, privacy policy  

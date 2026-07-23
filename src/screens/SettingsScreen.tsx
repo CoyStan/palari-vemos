@@ -218,8 +218,8 @@ export function SettingsScreen() {
             onValueChange={(value) => toggle("timeFormat24h", value)}
           />
           <Text className="text-caption text-muted">
-            Calendar hours only change how much of the day you see in Week/Day —
-            not your availability.
+            Calendar hours only change how much of the day you see in Week — not
+            your availability.
           </Text>
           <ChoiceChips
             label="Calendar starts at"

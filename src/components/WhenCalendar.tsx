@@ -35,7 +35,6 @@ const PLAN_CHIP: Record<
 };
 
 type Props = {
-  mode: "week" | "day";
   days: Date[];
   focusDate: Date;
   slots: ConcreteSlot[];
@@ -50,13 +49,11 @@ type Props = {
   onOpenSlot: (slot: ConcreteSlot) => void;
   onSkipSlot?: (slot: ConcreteSlot) => void;
   onOpenPlan: (planId: string) => void;
-  onSwitchToDay: () => void;
   /** Provider minute tick — drives the current-time line. */
   now: Date;
 };
 
 export function WhenCalendar({
-  mode,
   days,
   focusDate,
   slots,
@@ -69,22 +66,19 @@ export function WhenCalendar({
   onOpenSlot,
   onSkipSlot,
   onOpenPlan,
-  onSwitchToDay,
   now,
 }: Props) {
   const [gridWidth, setGridWidth] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
   const todayKey = formatDateKey(now);
   const focusKey = formatDateKey(focusDate);
-  const visibleDays = mode === "day" ? [focusDate] : days;
   const startHour = Math.max(0, Math.min(23, dayStartHour));
   const endHour = Math.max(startHour + 1, Math.min(24, dayEndHour));
   const hours = endHour - startHour;
   const gridHeight = hours * HOUR_HEIGHT;
 
   const daysAreaWidth = Math.max(0, gridWidth - TIME_GUTTER);
-  const dayWidth =
-    visibleDays.length > 0 ? daysAreaWidth / visibleDays.length : 0;
+  const dayWidth = days.length > 0 ? daysAreaWidth / days.length : 0;
 
   const nowMinutes = useMemo(() => {
     return now.getHours() * 60 + now.getMinutes();
@@ -99,7 +93,7 @@ export function WhenCalendar({
     }
   };
 
-  // Land near "now" so the grid feels oriented when opening Week/Day.
+  // Land near "now" so the grid feels oriented when opening Week.
   useEffect(() => {
     if (gridWidth <= 0) {
       return;
@@ -112,7 +106,7 @@ export function WhenCalendar({
       scrollRef.current?.scrollTo({ y: offset, animated: false });
     }, 40);
     return () => clearTimeout(timer);
-  }, [gridWidth, mode, focusKey, startHour, nowMinutes]);
+  }, [gridWidth, focusKey, startHour, nowMinutes]);
 
   return (
     <View
@@ -130,7 +124,7 @@ export function WhenCalendar({
           >
             <View style={{ width: TIME_GUTTER }} />
             <View className="flex-row" style={{ width: daysAreaWidth }}>
-              {visibleDays.map((day) => {
+              {days.map((day) => {
                 const key = formatDateKey(day);
                 const isToday = key === todayKey;
                 const isFocus = key === focusKey;
@@ -139,12 +133,7 @@ export function WhenCalendar({
                     key={key}
                     accessibilityRole="button"
                     accessibilityLabel={formatDayTitle(day)}
-                    onPress={() => {
-                      onFocusDate(day);
-                      if (mode === "week") {
-                        onSwitchToDay();
-                      }
-                    }}
+                    onPress={() => onFocusDate(day)}
                     className="items-center gap-1"
                     style={{ width: dayWidth }}
                   >
@@ -202,7 +191,7 @@ export function WhenCalendar({
               </View>
 
               <View className="flex-row" style={{ width: daysAreaWidth }}>
-                {visibleDays.map((day, dayIndex) => {
+                {days.map((day, dayIndex) => {
                   const dateKey = formatDateKey(day);
                   const daySlots = slots.filter(
                     (slot) => slot.date === dateKey,
@@ -236,7 +225,6 @@ export function WhenCalendar({
                           dayWidth={dayWidth}
                           dayStartHour={startHour}
                           booked={slotIsBooked(slot, plans)}
-                          compact={mode === "week"}
                           timeFormat24h={timeFormat24h}
                           onPress={() => {
                             if (!slotIsBooked(slot, plans)) {
@@ -259,7 +247,6 @@ export function WhenCalendar({
                           plan={plan}
                           dayWidth={dayWidth}
                           dayStartHour={startHour}
-                          compact={mode === "week"}
                           label={planTitle(plan, friends)}
                           onPress={() => onOpenPlan(plan.id)}
                         />
@@ -280,7 +267,7 @@ export function WhenCalendar({
                         </View>
                       ) : null}
 
-                      {dayIndex < visibleDays.length - 1 ? (
+                      {dayIndex < days.length - 1 ? (
                         <View className="absolute bottom-0 right-0 top-0 w-px bg-border" />
                       ) : null}
                     </View>
@@ -313,7 +300,6 @@ function FreeBlockView({
   dayWidth,
   dayStartHour,
   booked,
-  compact,
   timeFormat24h,
   onPress,
   onLongPress,
@@ -322,7 +308,6 @@ function FreeBlockView({
   dayWidth: number;
   dayStartHour: number;
   booked: boolean;
-  compact: boolean;
   timeFormat24h: boolean;
   onPress: () => void;
   onLongPress?: () => void;
@@ -371,13 +356,9 @@ function FreeBlockView({
     >
       <Text
         className="text-[10px] font-sans-bold text-primary"
-        numberOfLines={compact ? 2 : 3}
+        numberOfLines={2}
       >
-        {booked
-          ? "Booked"
-          : compact
-            ? "Free"
-            : `Free · ${formatClock(slot.startMinutes, timeFormat24h)}`}
+        {booked ? "Booked" : "Free"}
       </Text>
     </Pressable>
   );
@@ -387,14 +368,12 @@ function PlanBlockView({
   plan,
   dayWidth,
   dayStartHour,
-  compact,
   label,
   onPress,
 }: {
   plan: Plan;
   dayWidth: number;
   dayStartHour: number;
-  compact: boolean;
   label: string;
   onPress: () => void;
 }) {
@@ -430,7 +409,7 @@ function PlanBlockView({
       >
         {label}
       </Text>
-      {!compact || height > 40 ? (
+      {height > 40 ? (
         <Text
           className="mt-0.5 text-[10px] opacity-90"
           style={{ color: chip.fg }}

@@ -234,18 +234,18 @@ celebration, never streaks.
 
 **Acceptance.**
 
-- [ ] `"day"` mode is gone (type, toggle, WhenCalendar branches, settings copy)
+- [x] `"day"` mode is gone (type, toggle, WhenCalendar branches, settings copy)
       with no dead props left.
-- [ ] Dots render per spec for: 1 / 2 / 3+ friends, upcoming ring, mixed day
+- [x] Dots render per spec for: 1 / 2 / 3+ friends, upcoming ring, mixed day
       (verify via seeded dev data on web preview; `buildDayMarks` unit tests
       already cover aggregation).
-- [ ] Day sheet shows names, plan titles, memory content; upcoming rows open
+- [x] Day sheet shows names, plan titles, memory content; upcoming rows open
       plan detail.
-- [ ] Scrolling 12+ months back is smooth on web preview; initial position is
+- [x] Scrolling 12+ months back is smooth on web preview; initial position is
       the current month; "Today" chip returns to it.
-- [ ] No streak/chain/consecutive counts anywhere; month footer copy matches
+- [x] No streak/chain/consecutive counts anywhere; month footer copy matches
       spec.
-- [ ] `logCaughtUp` from a friend profile immediately produces a dot (state →
+- [x] `logCaughtUp` from a friend profile immediately produces a dot (state →
       derived marks, no reload needed).
 
 ## WP5 — Reminder series that survives absence
@@ -417,3 +417,13 @@ render path found in evaluation.
 - `currentSchemaShapeInvalid` only rejects non-array `catchUps` when
   `schemaVersion >= 4` and the field is present; missing `catchUps` on v3
   payloads defaults to `[]`.
+
+### WP3
+- `openCreatePlan` accepts `{ replace: true }` so PickPlanTime → CreatePlan
+  uses `replaceTop`. Ad-hoc slots (`ruleId: null`) keep the user-picked
+  duration instead of re-clipping to `defaultDurationMinutes`.
+
+### WP4
+- Day sheet adds section labels (“Caught up”, “Plans you did”, “Coming up”)
+  for clarity; content matches the contract.
+- `WhenCalendar` is week-only (removed `mode` / `onSwitchToDay`).

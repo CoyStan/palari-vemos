@@ -10,6 +10,7 @@ import { Icon } from "../components/Icon";
 import { InviteSheet } from "../components/InviteSheet";
 import { PressableScale } from "../components/PressableScale";
 import { RecoveryWarningsBanner } from "../components/RecoveryWarningsBanner";
+import { MonthsView } from "../components/MonthsView";
 import { WhenCalendar } from "../components/WhenCalendar";
 import {
   buildInsight,
@@ -24,8 +25,8 @@ import {
   addDays,
   formatDateKey,
   formatDayHeading,
-  formatDayTitle,
   formatWeekTitle,
+  MONTH_LABELS_SHORT,
   startOfDay,
   startOfWeek,
   weekDates,
@@ -92,27 +93,20 @@ export function WhenScreen() {
     [data.plans, days],
   );
 
-  const title =
-    mode === "day" ? formatDayTitle(focusDate) : formatWeekTitle(weekStart);
+  const title = formatWeekTitle(weekStart);
+
+  const monthsSubtitle = `${MONTH_LABELS_SHORT[now.getMonth()]} ${now.getFullYear()}`;
 
   const onPrev = () => {
-    if (mode === "day") {
-      setFocusDate(addDays(focusDate, -1));
-    } else {
-      const next = addDays(weekStart, -7);
-      setWeekStart(next);
-      setFocusDate(next);
-    }
+    const next = addDays(weekStart, -7);
+    setWeekStart(next);
+    setFocusDate(next);
   };
 
   const onNext = () => {
-    if (mode === "day") {
-      setFocusDate(addDays(focusDate, 1));
-    } else {
-      const next = addDays(weekStart, 7);
-      setWeekStart(next);
-      setFocusDate(next);
-    }
+    const next = addDays(weekStart, 7);
+    setWeekStart(next);
+    setFocusDate(next);
   };
 
   const goToday = () => {
@@ -202,7 +196,12 @@ export function WhenScreen() {
               So, when?
             </Text>
             <Text className="text-caption text-muted">
-              {greeting()} · {mode === "list" ? "the next few weeks" : title}
+              {greeting()} ·{" "}
+              {mode === "list"
+                ? "the next few weeks"
+                : mode === "months"
+                  ? monthsSubtitle
+                  : title}
             </Text>
           </View>
           <PressableScale
@@ -252,7 +251,7 @@ export function WhenScreen() {
             [
               ["list", "List"],
               ["week", "Week"],
-              ["day", "Day"],
+              ["months", "Months"],
             ] as const
           ).map(([id, label]) => {
             const active = mode === id;
@@ -301,7 +300,7 @@ export function WhenScreen() {
           </Text>
         </Pressable>
 
-        {mode !== "list" ? (
+        {mode === "week" ? (
           <View className="mb-3 flex-row items-center gap-2">
             <Pressable
               accessibilityRole="button"
@@ -551,6 +550,15 @@ export function WhenScreen() {
               );
             })}
           </ScrollView>
+        ) : mode === "months" ? (
+          <MonthsView
+            plans={data.plans}
+            catchUps={data.catchUps}
+            friends={data.friends}
+            firstDayOfWeek={firstDay}
+            now={now}
+            onOpenPlan={openPlanDetail}
+          />
         ) : (
           <View className="flex-1 gap-2">
             <Text className="text-caption text-muted">
@@ -559,7 +567,6 @@ export function WhenScreen() {
                 : "Tap a free slot to plan · use Skip on a slot · tap a plan to open"}
             </Text>
             <WhenCalendar
-              mode={mode}
               days={days}
               focusDate={focusDate}
               slots={calendarSlots}
@@ -572,7 +579,6 @@ export function WhenScreen() {
               onOpenSlot={openProposedSlot}
               onSkipSlot={onRequestSkip}
               onOpenPlan={openPlanDetail}
-              onSwitchToDay={() => setMode("day")}
               now={now}
             />
           </View>

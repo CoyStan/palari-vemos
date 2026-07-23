@@ -118,9 +118,9 @@ export type AppSettings = {
   /** 0=Sun … 6=Sat */
   firstDayOfWeek: number;
   timeFormat24h: boolean;
-  /** First hour shown in week/day calendar (0–23). Display only. */
+  /** First hour shown in week calendar (0–23). Display only. */
   calendarDayStartHour: number;
-  /** Exclusive end hour for week/day calendar (1–24). Display only. */
+  /** Exclusive end hour for week calendar (1–24). Display only. */
   calendarDayEndHour: number;
   /** When false, reminder notifications stay generic on the lock screen. */
   showReminderNames: boolean;
