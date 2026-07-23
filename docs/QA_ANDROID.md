@@ -20,7 +20,7 @@ Native Espresso / Compose / Roborazzi / Hilt from those skills do **not** apply 
 | --- | --- |
 | Crash on core flows | Manual smoke on release/preview APK |
 | Data loss | Persist across kill; export/wipe works |
-| Permission denial | Contacts / photos / notifications denied → graceful UX |
+| Permission denial | Photos / notifications denied → graceful UX |
 | Invite mistakes | Invite text always editable before share |
 | Guilt / policy voice | No overdue scores, streaks, red guilt alerts |
 
@@ -30,7 +30,7 @@ Native Espresso / Compose / Roborazzi / Hilt from those skills do **not** apply 
 | --- | --- | --- |
 | Unit | JUnit / domain | `npm run typecheck` + `npm run test:domain` |
 | UI instrumented | Espresso / Compose | Manual + optional Maestro later |
-| System / cross-app | UIAutomator | Manual: share sheet, contact picker, notifications |
+| System / cross-app | UIAutomator | Manual: share sheet, notifications |
 | Release | Device farm / GMD | Real phone + EAS preview APK before production |
 
 ## Device matrix (Tier 1 for V1)
@@ -47,19 +47,18 @@ Disable animations when automating later (`adb shell settings put global …` or
 ## Critical journeys (P0)
 
 1. **Onboarding** — welcome → add first friend + availability → land on When  
-2. **Add friend** — manual name; optional single contact picker (grant + deny)  
+2. **Add friend** — manual name entry; optional photo  
 3. **Availability** — recurring preset + one-time; skip occurrence; disable/delete rule  
-4. **When** — list / week / day; tap free slot → create plan  
-5. **Plan** — multi-friend, edit invite text, share, mark invited, per-friend status  
-6. **Follow-through** — Done / Cancelled / move friend to another slot  
-7. **Settings** — local reminders permission, calendar hours, export, wipe, privacy policy  
-8. **Persistence** — force-stop app; data still present; wipe clears all  
+4. **When** — list / week / months; Make a plan (zero availability OK); Months dots + day sheet  
+5. **Plan** — multi-friend, edit invite text, share, mark invited, per-friend status; Add to calendar  
+6. **Follow-through** — Done / Cancelled / move friend; calendar stale/cancelled hints  
+7. **Settings** — local reminders, Send feedback, calendar hours, export, wipe, privacy policy  
+8. **Persistence** — force-stop app; data still present; wipe clears all; v3→v4 upgrade 
 
 ## Permissions matrix
 
 | Permission | Grant | Deny |
 | --- | --- | --- |
-| Contacts | Picker copies one contact | Manual add still works |
 | Photos | Friend / memory photo attaches | App usable without photo |
 | Notifications | Local reminders can schedule | Toggle stays off; no crash |
 

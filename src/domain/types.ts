@@ -67,6 +67,13 @@ export type PlanFriend = {
   displayNameSnapshot: string | null;
 };
 
+/** Snapshot of what was handed to the OS calendar create-event UI (WP6). */
+export type PlanCalendarExport = {
+  exportedAt: string;
+  startAt: string;
+  endAt: string;
+};
+
 export type Plan = {
   id: string;
   title: string;
@@ -87,6 +94,17 @@ export type Plan = {
   cancelledAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Last OS calendar handoff; null until the user adds the plan to a calendar. */
+  calendarExport: PlanCalendarExport | null;
+};
+
+/** Manual “we caught up” log for Months-view history (one per friend per day). */
+export type CatchUpLog = {
+  id: string;
+  friendId: string;
+  /** YYYY-MM-DD — local day the catch-up happened. */
+  date: string;
+  createdAt: string;
 };
 
 export type AppSettings = {
@@ -100,9 +118,9 @@ export type AppSettings = {
   /** 0=Sun … 6=Sat */
   firstDayOfWeek: number;
   timeFormat24h: boolean;
-  /** First hour shown in week/day calendar (0–23). Display only. */
+  /** First hour shown in week calendar (0–23). Display only. */
   calendarDayStartHour: number;
-  /** Exclusive end hour for week/day calendar (1–24). Display only. */
+  /** Exclusive end hour for week calendar (1–24). Display only. */
   calendarDayEndHour: number;
   /** When false, reminder notifications stay generic on the lock screen. */
   showReminderNames: boolean;
@@ -115,6 +133,8 @@ export type AppData = {
   availability: AvailabilityRule[];
   skipped: SkippedOccurrence[];
   plans: Plan[];
+  /** Manual catch-up history; done-plan attendance is derived separately. */
+  catchUps: CatchUpLog[];
   settings: AppSettings;
 };
 
@@ -137,7 +157,7 @@ export const defaultSettings = (): AppSettings => ({
   notifyPlanTomorrow: true,
   notifyAskIfHappened: true,
   defaultDurationMinutes: 60,
-  firstDayOfWeek: 1,
+  firstDayOfWeek: 0,
   timeFormat24h: false,
   calendarDayStartHour: 7,
   calendarDayEndHour: 22,

@@ -7,6 +7,7 @@ import type {
   InviteStatus,
   InviteTone,
   Plan,
+  PlanCalendarExport,
   PlanStatus,
   ShareMethod,
   SkippedOccurrence,
@@ -208,6 +209,21 @@ export function computePlanStatus(friends: Plan["friends"]): PlanStatus {
   }
   const anyInvited = active.some((item) => item.status !== "not_invited");
   return anyInvited ? "waiting" : "draft";
+}
+
+export type CalendarExportHint = "moved" | "cancelled" | null;
+
+/** Whether a prior OS calendar handoff is out of date relative to the plan. */
+export function calendarExportHint(
+  plan: Pick<Plan, "status" | "startAt" | "endAt" | "calendarExport">,
+  exportSnap: PlanCalendarExport | null = plan.calendarExport,
+): CalendarExportHint {
+  if (!exportSnap) return null;
+  if (plan.status === "cancelled") return "cancelled";
+  if (exportSnap.startAt !== plan.startAt || exportSnap.endAt !== plan.endAt) {
+    return "moved";
+  }
+  return null;
 }
 
 export function buildInviteText(input: {

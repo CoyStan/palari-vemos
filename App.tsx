@@ -26,6 +26,7 @@ import { FriendsScreen } from "./src/screens/FriendsScreen";
 import { MoveFriendScreen } from "./src/screens/MoveFriendScreen";
 import { OnboardingScreen } from "./src/screens/OnboardingScreen";
 import { PastPlansScreen } from "./src/screens/PastPlansScreen";
+import { PickPlanTimeScreen } from "./src/screens/PickPlanTimeScreen";
 import { PlanDetailScreen } from "./src/screens/PlanDetailScreen";
 import { PrivacyPolicyScreen } from "./src/screens/PrivacyPolicyScreen";
 import { RecoveryScreen } from "./src/screens/RecoveryScreen";
@@ -56,6 +57,8 @@ function renderStackScreen(screen: ScreenId) {
       return <RecoveryScreen />;
     case "createPlan":
       return <CreatePlanScreen />;
+    case "pickPlanTime":
+      return <PickPlanTimeScreen />;
     case "planDetail":
       return <PlanDetailScreen />;
     case "moveFriend":

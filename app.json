@@ -1,8 +1,8 @@
 {
   "expo": {
     "name": "So, When?",
-    "slug": "so-when",
-    "version": "0.1.0",
+    "slug": "vemos",
+    "version": "0.2.0",
     "scheme": "sowhen",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -17,12 +17,12 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": [
-        "android.permission.READ_CONTACTS",
-        "android.permission.WRITE_CONTACTS"
-      ],
+      "permissions": [],
       "blockedPermissions": [
+        "android.permission.READ_CONTACTS",
         "android.permission.WRITE_CONTACTS",
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR",
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -34,7 +34,6 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.sowhen.myapp",
       "infoPlist": {
-        "NSContactsUsageDescription": "So, When? only copies the single contact you choose. Your address book is never scanned or uploaded.",
         "NSPhotoLibraryUsageDescription": "Add an optional photo for a friend you want to see."
       }
     },
@@ -51,12 +50,6 @@
     },
     "plugins": [
       "expo-font",
-      [
-        "expo-contacts",
-        {
-          "contactsPermission": "So, When? only copies the single contact you choose. Your address book is never scanned or uploaded."
-        }
-      ],
       [
         "expo-image-picker",
         {

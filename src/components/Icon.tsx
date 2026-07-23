@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import type { ComponentProps } from "react";
+import { Platform } from "react-native";
 
 import { color } from "../foundation";
 
@@ -41,6 +42,14 @@ export function Icon({
       size={size}
       color={tint}
       accessibilityLabel={accessibilityLabel}
+      // Keep glyph inside a square box so icons (esp. x) optically center in circles.
+      style={{
+        width: size,
+        height: size,
+        textAlign: "center",
+        lineHeight: size,
+        ...(Platform.OS === "android" ? { includeFontPadding: false } : null),
+      }}
     />
   );
 }

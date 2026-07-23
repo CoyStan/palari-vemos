@@ -1,4 +1,4 @@
-import { Alert, Platform, ScrollView, Text, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Avatar } from "../components/Avatar";
@@ -6,83 +6,11 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { PressableScale } from "../components/PressableScale";
 import { catchUpLabel, catchUpStatus, lastMetLabel } from "../domain/model";
-import { pickOneContact } from "../services/contacts";
-import { copyIntoOwnedMedia } from "../services/media";
 import { useApp } from "../state/AppProvider";
 import { cn } from "../ui/cn";
 
 export function FriendsScreen() {
-  const { data, openAddFriend, openFriendProfile, saveFriend } = useApp();
-
-  const onPickContact = () => {
-    if (Platform.OS === "web") {
-      Alert.alert(
-        "Contacts",
-        "Contact picking works on Android and iOS. You can still add manually.",
-      );
-      openAddFriend();
-      return;
-    }
-    Alert.alert(
-      "Choose one contact",
-      "So, When? opens your contact picker to fill in a name and optional phone or photo for this friend only. Contacts are never scanned or uploaded.",
-      [
-        { text: "Add manually", onPress: openAddFriend },
-        {
-          text: "Continue",
-          onPress: () => {
-            void (async () => {
-              const result = await pickOneContact();
-              if (!result.ok) {
-                if (result.reason === "cancelled") {
-                  return;
-                }
-                Alert.alert("Contacts", result.message, [
-                  { text: "Add manually", onPress: openAddFriend },
-                  { text: "OK", style: "cancel" },
-                ]);
-                return;
-              }
-              let photoUri: string | null = null;
-              if (result.contact.photoUri) {
-                const owned = await copyIntoOwnedMedia(
-                  result.contact.photoUri,
-                  "contact",
-                );
-                if (!owned.ok) {
-                  Alert.alert("Photo not saved", owned.message);
-                } else {
-                  photoUri = owned.uri;
-                }
-              }
-              await saveFriend({
-                name: result.contact.name,
-                photoUri,
-                phone: result.contact.phone,
-                shareMethod: "whatsapp",
-                rhythm: "monthly",
-                customDays: 45,
-                lastMetAt: null,
-              });
-            })();
-          },
-        },
-        { text: "Cancel", style: "cancel" },
-      ],
-    );
-  };
-
-  const onAddFriend = () => {
-    Alert.alert(
-      "Add a friend",
-      "We only copy the one contact you pick. Everything stays on your phone.",
-      [
-        { text: "Add manually", onPress: openAddFriend },
-        { text: "Choose from contacts", onPress: () => onPickContact() },
-        { text: "Cancel", style: "cancel" },
-      ],
-    );
-  };
+  const { data, openAddFriend, openFriendProfile } = useApp();
 
   return (
     <SafeAreaView
@@ -100,7 +28,7 @@ export function FriendsScreen() {
         </View>
 
         <View className="mb-4">
-          <Button label="Add friend" onPress={onAddFriend} />
+          <Button label="Add friend" onPress={openAddFriend} />
         </View>
 
         <ScrollView

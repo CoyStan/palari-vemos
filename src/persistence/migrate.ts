@@ -3,10 +3,12 @@ import type {
   AppSettings,
   AvailabilityKind,
   AvailabilityRule,
+  CatchUpLog,
   CatchUpRhythm,
   Friend,
   InviteStatus,
   Plan,
+  PlanCalendarExport,
   PlanFriend,
   PlanStatus,
   Recurrence,
@@ -15,7 +17,7 @@ import type {
 } from "../domain/types";
 import { defaultSettings } from "../domain/types";
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 const SHARE_METHODS: ShareMethod[] = [
   "whatsapp",
@@ -123,6 +125,7 @@ export function emptyAppData(): AppData {
     availability: [],
     skipped: [],
     plans: [],
+    catchUps: [],
     settings: defaultSettings(),
   };
 }
@@ -168,9 +171,7 @@ function parseSettings(value: unknown): AppSettings {
     defaultDurationMinutes: [30, 60, 90, 120, 180].includes(duration)
       ? duration
       : base.defaultDurationMinutes,
-    firstDayOfWeek: clampDay(
-      asNumber(value.firstDayOfWeek, base.firstDayOfWeek),
-    ),
+    firstDayOfWeek: 0, // Sunday — Week & Months calendars (no settings picker yet)
     timeFormat24h: asBool(value.timeFormat24h, base.timeFormat24h),
     calendarDayStartHour: start,
     calendarDayEndHour: end,
@@ -380,6 +381,57 @@ function parsePlan(
         : asNullableString(value.cancelledAt),
     createdAt: asString(value.createdAt, new Date().toISOString()),
     updatedAt: asString(value.updatedAt, new Date().toISOString()),
+    calendarExport: parseCalendarExport(value.calendarExport, warnings),
+  };
+}
+
+function parseCalendarExport(
+  value: unknown,
+  warnings: string[],
+): PlanCalendarExport | null {
+  if (value == null) return null;
+  if (!isRecord(value)) {
+    warnings.push("Ignored a malformed calendarExport snapshot.");
+    return null;
+  }
+  const exportedAt = asString(value.exportedAt);
+  const startAt = asString(value.startAt);
+  const endAt = asString(value.endAt);
+  if (!isIsoDate(exportedAt) || !isIsoDate(startAt) || !isIsoDate(endAt)) {
+    warnings.push("Nulled a calendarExport with invalid timestamps.");
+    return null;
+  }
+  return { exportedAt, startAt, endAt };
+}
+
+function parseCatchUp(
+  value: unknown,
+  friendIds: Set<string>,
+  warnings: string[],
+): CatchUpLog | null {
+  if (
+    !isRecord(value) ||
+    typeof value.id !== "string" ||
+    typeof value.friendId !== "string"
+  ) {
+    warnings.push("Dropped a catch-up log with missing id or friend.");
+    return null;
+  }
+  const date = asString(value.date);
+  if (!isDateKey(date)) {
+    warnings.push(`Dropped catch-up ${value.id}: invalid date.`);
+    return null;
+  }
+  if (!friendIds.has(value.friendId)) {
+    warnings.push(`Dropped catch-up ${value.id}: friend missing.`);
+    return null;
+  }
+  const createdAt = asString(value.createdAt, new Date().toISOString());
+  return {
+    id: value.id,
+    friendId: value.friendId,
+    date,
+    createdAt: isIsoDate(createdAt) ? createdAt : new Date().toISOString(),
   };
 }
 
@@ -405,6 +457,13 @@ function currentSchemaShapeInvalid(parsed: Record<string, unknown>): boolean {
   if (!Array.isArray(parsed.availability)) return true;
   if (!Array.isArray(parsed.skipped)) return true;
   if (!Array.isArray(parsed.plans)) return true;
+  if (
+    parsed.schemaVersion >= 4 &&
+    parsed.catchUps !== undefined &&
+    !Array.isArray(parsed.catchUps)
+  ) {
+    return true;
+  }
   if (parsed.settings !== undefined && !isRecord(parsed.settings)) return true;
   return false;
 }
@@ -490,6 +549,18 @@ export function migrateAndValidate(raw: string | null): LoadResult {
         .filter((item): item is Plan => item !== null)
     : [];
 
+  const catchUpsRaw = Array.isArray(parsed.catchUps) ? parsed.catchUps : [];
+  const catchUps: CatchUpLog[] = [];
+  const catchUpKeys = new Set<string>();
+  for (const item of catchUpsRaw) {
+    const log = parseCatchUp(item, friendIds, warnings);
+    if (!log) continue;
+    const key = `${log.friendId}|${log.date}`;
+    if (catchUpKeys.has(key)) continue;
+    catchUpKeys.add(key);
+    catchUps.push(log);
+  }
+
   const onboardingComplete =
     asBool(parsed.onboardingComplete, false) || friends.length > 0;
 
@@ -502,6 +573,7 @@ export function migrateAndValidate(raw: string | null): LoadResult {
       availability,
       skipped,
       plans,
+      catchUps,
       settings: parseSettings(parsed.settings),
     },
     warnings,

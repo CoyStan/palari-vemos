@@ -16,6 +16,7 @@ import {
   createPlanState,
   deleteAvailabilityRule,
   lookAroundFirst,
+  logCaughtUpState,
   markInviteSentState,
   markPlanCancelledState,
   markPlanDoneState,
@@ -37,7 +38,6 @@ import {
 import {
   buildInviteText,
   buildTimeline,
-  defaultOneOffPlanSlot,
   expandAvailability,
   makeOneOffSlot,
   proposePlanWindow,
@@ -77,7 +77,7 @@ import { shareInviteMessage } from "../services/share";
 export type AddFriendForPlanOrigin = "inviteSheet" | "createPlan";
 
 export type TabId = "when" | "friends" | "settings";
-export type WhenMode = "list" | "week" | "day";
+export type WhenMode = "list" | "week" | "months";
 export type NavMotion = "none" | "push" | "pop" | "replace";
 export type ScreenId =
   | "loading"
@@ -93,6 +93,7 @@ export type ScreenId =
   | "editAvailability"
   | "availability"
   | "createPlan"
+  | "pickPlanTime"
   | "planDetail"
   | "moveFriend"
   | "privacyPolicy"
@@ -141,8 +142,8 @@ type AppContextValue = {
   openAddFriend: () => void;
   openAddFriendForPlan: (
     slot: ConcreteSlot,
-    friendIds: string[],
-    origin: AddFriendForPlanOrigin,
+    friendIds?: string[],
+    origin?: AddFriendForPlanOrigin,
   ) => void;
   openEditFriend: (friendId: string) => void;
   openFriendProfile: (friendId: string) => void;
@@ -151,9 +152,13 @@ type AppContextValue = {
   openAvailability: () => void;
   openPrivacyPolicy: () => void;
   openOnboarding: () => void;
-  openCreatePlan: (slot: ConcreteSlot, friendIds?: string[]) => void;
-  /** Direct path — synthesizes a one-off when; availability is optional. */
+  /** Route to pickPlanTime so availability is optional. */
   openMakePlan: (friendIds?: string[]) => void;
+  openCreatePlan: (
+    slot: ConcreteSlot,
+    friendIds?: string[],
+    options?: { replace?: boolean },
+  ) => void;
   /** Update the selected plan window (Create Plan date/time editors). */
   setSelectedPlanWindow: (startAt: string, endAt: string) => void;
   openPlanDetail: (planId: string) => void;
@@ -206,6 +211,7 @@ type AppContextValue = {
   markPlanDone: (attendedFriendIds: string[]) => Promise<void>;
   /** Optional planId for When list chips; defaults to activePlanId. */
   markPlanStatus: (status: PlanStatus, planId?: string) => Promise<void>;
+  setPlanCalendarExport: (snapshot: Plan["calendarExport"]) => Promise<void>;
   openMoveFriend: (friendId: string) => void;
   moveFriendToSlot: (
     slot: ConcreteSlot,
@@ -473,8 +479,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const openAddFriendForPlan = useCallback(
     (
       slot: ConcreteSlot,
-      friendIds: string[],
-      origin: AddFriendForPlanOrigin,
+      friendIds?: string[],
+      origin: AddFriendForPlanOrigin = "inviteSheet",
     ) => {
       const window = proposePlanWindow(
         slot.startAt,
@@ -493,7 +499,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           new Date(window.endAt).getMinutes(),
       };
       setSelectedSlot(proposed);
-      setSelectedFriendIds(friendIds);
+      if (friendIds) {
+        setSelectedFriendIds(friendIds);
+      }
       addingFriendForPlanRef.current = origin;
       setActiveFriendId(null);
       push("addFriend");
@@ -534,12 +542,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const openPrivacyPolicy = useCallback(() => push("privacyPolicy"), [push]);
   const openOnboarding = useCallback(() => push("onboarding"), [push]);
 
+  const openMakePlan = useCallback(
+    (friendIds?: string[]) => {
+      setSelectedFriendIds(friendIds ?? []);
+      setSelectedSlot(null);
+      push("pickPlanTime");
+    },
+    [push],
+  );
+
   const openCreatePlan = useCallback(
-    (slot: ConcreteSlot, friendIds?: string[]) => {
+    (
+      slot: ConcreteSlot,
+      friendIds?: string[],
+      options?: { replace?: boolean },
+    ) => {
+      const durationMinutes =
+        slot.ruleId === null
+          ? Math.max(30, slot.endMinutes - slot.startMinutes)
+          : dataRef.current.settings.defaultDurationMinutes;
       const window = proposePlanWindow(
         slot.startAt,
         slot.endAt,
-        dataRef.current.settings.defaultDurationMinutes,
+        durationMinutes,
       );
       setSelectedSlot({
         ...slot,
@@ -553,22 +578,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
           new Date(window.endAt).getMinutes(),
       });
       setSelectedFriendIds(friendIds ?? []);
-      push("createPlan");
+      if (options?.replace) {
+        replaceTop("createPlan");
+      } else {
+        push("createPlan");
+      }
     },
-    [push],
-  );
-
-  const openMakePlan = useCallback(
-    (friendIds?: string[]) => {
-      const slot = defaultOneOffPlanSlot(
-        new Date(),
-        dataRef.current.settings.defaultDurationMinutes,
-      );
-      setSelectedSlot(slot);
-      setSelectedFriendIds(friendIds ?? []);
-      push("createPlan");
-    },
-    [push],
+    [push, replaceTop],
   );
 
   const setSelectedPlanWindow = useCallback(
@@ -643,7 +659,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (origin === "createPlan") {
           goBack();
         } else {
-          // From InviteSheet: enter CreatePlan exactly once.
+          // From InviteSheet or pickPlanTime: enter CreatePlan exactly once.
           replaceTop("createPlan");
         }
         return;
@@ -822,9 +838,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           };
           const timeOrPlaceChanged = Boolean(
             patch.startAt ||
-            patch.endAt ||
-            patch.activity !== undefined ||
-            patch.place !== undefined,
+              patch.endAt ||
+              patch.activity !== undefined ||
+              patch.place !== undefined,
           );
           if (timeOrPlaceChanged) {
             updated.friends = updated.friends.map((item) => {
@@ -1022,6 +1038,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [activePlanId, commit, goWhen],
   );
 
+  const setPlanCalendarExport = useCallback(
+    async (snapshot: Plan["calendarExport"]) => {
+      if (!activePlanId) return;
+      await commit((current) => ({
+        ...current,
+        plans: current.plans.map((plan) =>
+          plan.id === activePlanId
+            ? {
+                ...plan,
+                calendarExport: snapshot,
+                updatedAt: new Date().toISOString(),
+              }
+            : plan,
+        ),
+      }));
+    },
+    [activePlanId, commit],
+  );
+
   const openMoveFriend = useCallback(
     (friendId: string) => {
       setMoveFriendId(friendId);
@@ -1170,12 +1205,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const logCaughtUp = useCallback(
     async (friendId: string, whenIso: string) => {
-      await commit((current) => ({
-        ...current,
-        friends: current.friends.map((friend) =>
-          friend.id === friendId ? { ...friend, lastMetAt: whenIso } : friend,
-        ),
-      }));
+      await commit((current) =>
+        logCaughtUpState(current, friendId, whenIso, createId),
+      );
     },
     [commit],
   );
@@ -1223,8 +1255,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       openAvailability,
       openPrivacyPolicy,
       openOnboarding,
-      openCreatePlan,
       openMakePlan,
+      openCreatePlan,
       setSelectedPlanWindow,
       openPlanDetail,
       openPastPlans,
@@ -1250,6 +1282,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       confirmInviteSent,
       markPlanDone,
       markPlanStatus,
+      setPlanCalendarExport,
       openMoveFriend,
       moveFriendToSlot,
       updateSettings,
@@ -1303,8 +1336,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       openAvailability,
       openPrivacyPolicy,
       openOnboarding,
-      openCreatePlan,
       openMakePlan,
+      openCreatePlan,
       setSelectedPlanWindow,
       openPlanDetail,
       openPastPlans,
@@ -1329,6 +1362,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       confirmInviteSent,
       markPlanDone,
       markPlanStatus,
+      setPlanCalendarExport,
       openMoveFriend,
       moveFriendToSlot,
       updateSettings,

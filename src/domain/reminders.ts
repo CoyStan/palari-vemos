@@ -1,5 +1,6 @@
-import { catchUpStatus } from "./model";
-import type { AppData } from "./types";
+import { catchUpBaselineIso, catchUpStatus, rhythmDays } from "./model";
+import { daysSince, formatDateKey } from "./time";
+import type { AppData, Friend } from "./types";
 
 export type ReminderSpec = {
   key: string;
@@ -8,8 +9,24 @@ export type ReminderSpec = {
   triggerAt: Date;
 };
 
-/** How many weekly catch-up nudges to pre-schedule (fades after ~a month). */
-export const CATCH_UP_NUDGE_WEEKS = 4;
+/** Days past cadence: higher = more overdue. Non-due friends return null. */
+function overdueDays(friend: Friend, now: Date): number | null {
+  if (catchUpStatus(friend, now) !== "due") return null;
+  const cadence = rhythmDays(friend);
+  if (cadence === null) return null;
+  const since = daysSince(catchUpBaselineIso(friend), now);
+  if (since === null) return null;
+  return since - cadence;
+}
+
+function nextElevenOClock(from: Date): Date {
+  const quiet = new Date(from);
+  quiet.setHours(11, 0, 0, 0);
+  if (quiet.getTime() <= from.getTime()) {
+    quiet.setDate(quiet.getDate() + 1);
+  }
+  return quiet;
+}
 
 /** Pure reminder planner — unit-tested without Expo. */
 export function buildReminderSpecs(
@@ -62,28 +79,31 @@ export function buildReminderSpecs(
   }
 
   if (data.settings.notifyCatchUpDue) {
-    const due = data.friends
-      .filter((friend) => catchUpStatus(friend, now) === "due")
-      .sort((a, b) => a.name.localeCompare(b.name));
+    const dueFriends = data.friends
+      .map((friend) => ({ friend, overdue: overdueDays(friend, now) }))
+      .filter(
+        (item): item is { friend: Friend; overdue: number } =>
+          item.overdue !== null,
+      )
+      .sort((a, b) => {
+        if (b.overdue !== a.overdue) return b.overdue - a.overdue;
+        return a.friend.name.localeCompare(b.friend.name);
+      })
+      .map((item) => item.friend);
 
-    if (due.length > 0) {
-      const firstQuiet = new Date(now);
-      firstQuiet.setHours(11, 0, 0, 0);
-      if (firstQuiet.getTime() <= now.getTime()) {
-        firstQuiet.setDate(firstQuiet.getDate() + 1);
-      }
-
-      for (let week = 0; week < CATCH_UP_NUDGE_WEEKS; week++) {
-        const quiet = new Date(firstQuiet);
-        quiet.setDate(firstQuiet.getDate() + week * 7);
-        const friend = due[week % due.length]!;
+    if (dueFriends.length > 0) {
+      const first = nextElevenOClock(now);
+      for (let i = 0; i < 4; i += 1) {
+        const triggerAt = new Date(first);
+        triggerAt.setDate(first.getDate() + i * 7);
+        const friend = dueFriends[i % dueFriends.length]!;
         specs.push({
-          key: `catchup:${friend.id}:${quiet.toISOString().slice(0, 10)}`,
+          key: `catchup:${friend.id}:${formatDateKey(triggerAt)}`,
           title: "So, When?",
           body: showNames
             ? `Want to make a plan with ${friend.name}?`
             : "Someone might be due for a catch-up.",
-          triggerAt: quiet,
+          triggerAt,
         });
       }
     }

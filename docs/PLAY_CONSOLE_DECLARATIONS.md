@@ -34,7 +34,9 @@ Must not appear without justification:
 - `QUERY_ALL_PACKAGES`
 - exact alarm access if unused
 
-Contacts: prefer OS single-contact picker with minimal permissions; if `READ_CONTACTS` is required by the picker on target APIs, request only on Choose Contact with in-app explanation and manual entry fallback. Do not claim “no contact permission” until the final binary proves it.
+Contacts: not used. Friends are typed manually; do not declare contact data collection. Confirm the final AAB has no `READ_CONTACTS`.
+
+Calendar: one-way OS create-event handoff only (no calendar read). Confirm the final AAB has no `READ_CALENDAR` / `WRITE_CALENDAR`.
 
 ## Content rating / ads
 

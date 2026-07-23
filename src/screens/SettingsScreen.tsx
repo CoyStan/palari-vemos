@@ -7,11 +7,12 @@ import {
   Text,
   View,
 } from "react-native";
+import Constants from "expo-constants";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
-import { feedbackMailtoUrl, FEEDBACK_EMAIL } from "../content/feedback";
+import { SUPPORT_EMAIL } from "../content/privacyPolicy";
 import { color } from "../foundation";
 import { ensureNotificationPermission } from "../services/reminders";
 import { useApp } from "../state/AppProvider";
@@ -69,6 +70,26 @@ export function SettingsScreen() {
       }
     }
     await updateSettings({ notificationsEnabled: enabled });
+  };
+
+  const onSendFeedback = async () => {
+    const version =
+      Constants.expoConfig?.version ?? Constants.nativeAppVersion ?? "0.2";
+    const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(
+      `So, When? feedback (v${version})`,
+    )}`;
+    try {
+      const canOpen = await Linking.canOpenURL(url);
+      if (!canOpen) {
+        throw new Error("unsupported");
+      }
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert(
+        "Email not available",
+        `You can write us at ${SUPPORT_EMAIL}.`,
+      );
+    }
   };
 
   const onExport = async () => {
@@ -175,49 +196,9 @@ export function SettingsScreen() {
         <Section title="Catch-up reminders">
           <ToggleRow
             label="Catch-up nudge"
-            hint="Quiet weekly nudges for a few weeks, rotating who is due"
             value={settings.notifyCatchUpDue}
             onValueChange={(value) => toggle("notifyCatchUpDue", value)}
             disabled={!settings.notificationsEnabled}
-          />
-        </Section>
-
-        <Section title="Privacy & data">
-          <Text className="text-body text-muted">
-            So, When? stores friends, availability, and plans only on this
-            device. Friends do not need the app. Contacts are never scanned or
-            uploaded — you choose one contact at a time when you want to copy a
-            name or number.
-          </Text>
-          <Button
-            label="Privacy policy"
-            variant="secondary"
-            onPress={openPrivacyPolicy}
-          />
-          <Button
-            label="Export data"
-            variant="secondary"
-            onPress={() => void onExport()}
-          />
-          <Button label="Delete all data" variant="ghost" onPress={onWipe} />
-        </Section>
-
-        <Section title="About">
-          <Text className="text-body text-muted">
-            So, When? is made by Palari Labs, Inc. Version 1 is a private
-            organizer — not a social network.
-          </Text>
-          <Button
-            label="Send feedback"
-            variant="secondary"
-            onPress={() => {
-              void Linking.openURL(feedbackMailtoUrl()).catch(() => {
-                Alert.alert(
-                  "Couldn’t open mail",
-                  `Email us at ${FEEDBACK_EMAIL}`,
-                );
-              });
-            }}
           />
         </Section>
 
@@ -241,8 +222,8 @@ export function SettingsScreen() {
             onValueChange={(value) => toggle("timeFormat24h", value)}
           />
           <Text className="text-caption text-muted">
-            Calendar hours only change how much of the day you see in Week/Day —
-            not your availability.
+            Calendar hours only change how much of the day you see in Week — not
+            your availability.
           </Text>
           <ChoiceChips
             label="Calendar starts at"
@@ -271,6 +252,37 @@ export function SettingsScreen() {
             value={settings.showReminderNames}
             onValueChange={(value) => toggle("showReminderNames", value)}
             disabled={!settings.notificationsEnabled}
+          />
+        </Section>
+
+        <Section title="Privacy & data">
+          <Text className="text-body text-muted">
+            So, When? stores friends, availability, and plans only on this
+            device. Friends do not need the app. Add friends by typing a name —
+            nothing is scanned or uploaded from your address book.
+          </Text>
+          <Button
+            label="Privacy policy"
+            variant="secondary"
+            onPress={openPrivacyPolicy}
+          />
+          <Button
+            label="Export data"
+            variant="secondary"
+            onPress={() => void onExport()}
+          />
+          <Button label="Delete all data" variant="ghost" onPress={onWipe} />
+        </Section>
+
+        <Section title="About">
+          <Text className="text-body text-muted">
+            So, When? is made by Palari Labs, Inc. Version 1 is a private
+            organizer — not a social network.
+          </Text>
+          <Button
+            label="Send feedback"
+            variant="secondary"
+            onPress={() => void onSendFeedback()}
           />
         </Section>
       </ScrollView>
