@@ -1,8 +1,18 @@
-import { Alert, Pressable, ScrollView, Switch, Text, View } from "react-native";
+import {
+  Alert,
+  Linking,
+  Pressable,
+  ScrollView,
+  Switch,
+  Text,
+  View,
+} from "react-native";
+import Constants from "expo-constants";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { SUPPORT_EMAIL } from "../content/privacyPolicy";
 import { color } from "../foundation";
 import { ensureNotificationPermission } from "../services/reminders";
 import { useApp } from "../state/AppProvider";
@@ -60,6 +70,26 @@ export function SettingsScreen() {
       }
     }
     await updateSettings({ notificationsEnabled: enabled });
+  };
+
+  const onSendFeedback = async () => {
+    const version =
+      Constants.expoConfig?.version ?? Constants.nativeAppVersion ?? "0.2";
+    const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(
+      `So, When? feedback (v${version})`,
+    )}`;
+    try {
+      const canOpen = await Linking.canOpenURL(url);
+      if (!canOpen) {
+        throw new Error("unsupported");
+      }
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert(
+        "Email not available",
+        `You can write us at ${SUPPORT_EMAIL}.`,
+      );
+    }
   };
 
   const onExport = async () => {
@@ -196,6 +226,11 @@ export function SettingsScreen() {
             So, When? is made by Palari Labs, Inc. Version 1 is a private
             organizer — not a social network.
           </Text>
+          <Button
+            label="Send feedback"
+            variant="secondary"
+            onPress={() => void onSendFeedback()}
+          />
         </Section>
 
         <Section title="Advanced">

@@ -13,7 +13,6 @@ import { RecoveryWarningsBanner } from "../components/RecoveryWarningsBanner";
 import { MonthsView } from "../components/MonthsView";
 import { WhenCalendar } from "../components/WhenCalendar";
 import {
-  buildInsight,
   expandAvailability,
   formatClock,
   INVITE_STATUS_LABELS,
@@ -153,11 +152,6 @@ export function WhenScreen() {
     setSkipSlot(null);
   };
 
-  const insight = useMemo(
-    () => buildInsight(data.friends, data.plans),
-    [data.friends, data.plans],
-  );
-
   const spotlightNames = todaySpotlight
     ? todaySpotlight.friends
         .filter((item) => item.status === "yes")
@@ -279,15 +273,6 @@ export function WhenScreen() {
             );
           })}
         </View>
-
-        {insight && mode === "list" ? (
-          <View className="mb-3 flex-row items-start gap-2 rounded-control bg-surface/80 px-3 py-2.5">
-            <Icon name="sun" size={14} color={color.primary} />
-            <Text className="flex-1 text-caption text-muted italic">
-              {insight}
-            </Text>
-          </View>
-        ) : null}
 
         <Pressable
           accessibilityRole="button"

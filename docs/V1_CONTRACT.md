@@ -431,3 +431,9 @@ render path found in evaluation.
 ### WP5
 - Catch-up keys use local `formatDateKey(triggerAt)` (was UTC ISO slice) so
   the date matches the local 11:00 trigger day.
+
+### WP6
+- Import `createEventInCalendarAsync` from `expo-calendar/legacy` (SDK 57
+  default export throws deprecation stubs).
+- Calendar permissions appear only as `tools:node="remove"` via
+  `blockedPermissions`.

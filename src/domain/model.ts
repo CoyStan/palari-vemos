@@ -270,15 +270,6 @@ export function buildInviteText(input: {
   return `Hey ${name} — I’m free ${when}. Want to catch up?`;
 }
 
-/** Alpha: no generic insight claims about life outside So, When?. */
-export function buildInsight(
-  _friends: Friend[],
-  _plans: Plan[],
-  _now = new Date(),
-): string | null {
-  return null;
-}
-
 export function formatPlanWhen(
   iso: string,
   timeFormat24h: boolean,
