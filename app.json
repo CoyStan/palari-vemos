@@ -8,7 +8,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "android": {
-      "package": "com.palarilabs.vemos",
+      "package": "com.sowhen.myapp",
       "allowBackup": false,
       "adaptiveIcon": {
         "backgroundColor": "#FAF8F5",
@@ -32,7 +32,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.palarilabs.vemos",
+      "bundleIdentifier": "com.sowhen.myapp",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Add an optional photo for a friend you want to see."
       }
@@ -43,7 +43,10 @@
     },
     "extra": {
       "product": "so-when",
-      "organization": "Palari Labs, Inc."
+      "organization": "Palari Labs, Inc.",
+      "eas": {
+        "projectId": "511080a9-ef93-40b2-8948-8e84de2cadd5"
+      }
     },
     "plugins": [
       "expo-font",
@@ -71,6 +74,7 @@
         }
       ],
       "expo-sharing"
-    ]
+    ],
+    "owner": "palari.io"
   }
 }

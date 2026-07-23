@@ -9,7 +9,7 @@ Friends do not need So, When?, an account, or an invitation link. Version 1 is a
 ## Build for the first Google Play release
 
 - Expo-managed React Native app, TypeScript, Android-first.
-- Package id: `com.palarilabs.vemos`. Change only if Play Console rejects it.
+- Package id: `com.sowhen.myapp` (matches Google Play Console). Do not change without an explicit Play decision.
 - Start with `npm install`, then `npm run android`.
 - Keep the first release local-first: no account, backend, OAuth, payments, analytics, or remote database without an explicit decision.
 - Use Expo modules and the native share sheet. Do not build a messaging system.
@@ -21,9 +21,9 @@ Friends do not need So, When?, an account, or an invitation link. Version 1 is a
 2. Friends: name, optional photo/phone/share method, catch-up rhythm, last-seen date.
 3. When: chronological next 2–3 weeks — availability, plans, friends due for a catch-up.
 4. Availability: recurring presets + one-time; skip occurrence without changing the rule.
-5. Plan: multi-friend picker, activity/place/note, editable invite text, native share.
+5. Plan: multi-friend picker (from a free slot **or** a one-off date/time), activity/place/note, editable invite text, native share.
 6. Follow-through: per-friend statuses, plan Done/Cancelled, move to another time.
-7. Settings: quiet local reminders, defaults, privacy, export, wipe.
+7. Settings: quiet local reminders, defaults, privacy, export, wipe, feedback.
 
 ## Explicitly not version 1
 

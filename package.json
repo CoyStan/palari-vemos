@@ -53,6 +53,7 @@
     "test": "tsx scripts/test-domain.ts && tsx scripts/test-hardening.ts",
     "test:domain": "tsx scripts/test-domain.ts",
     "sync:privacy": "tsx scripts/sync-privacy-docs.ts",
+    "check:privacy": "tsx scripts/check-privacy-docs.ts",
     "doctor": "npx expo-doctor",
     "export:android": "npx expo export --platform android"
   },

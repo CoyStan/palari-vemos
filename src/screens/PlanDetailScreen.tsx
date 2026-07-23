@@ -109,14 +109,8 @@ export function PlanDetailScreen() {
     setNote(activePlan.note);
     if (draftPlanIdRef.current !== activePlan.id) {
       draftPlanIdRef.current = activePlan.id;
-      setInviteDrafts(
-        Object.fromEntries(
-          activePlan.friends.map((item) => [
-            item.friendId,
-            item.invitationText,
-          ]),
-        ),
-      );
+      // Local drafts exist only while editing — clear when switching plans.
+      setInviteDrafts({});
       setEditingInvite({});
     }
 
@@ -206,19 +200,44 @@ export function PlanDetailScreen() {
     if (text === undefined) return;
     void updateInvitationText(friendId, text);
     setEditingInvite((current) => ({ ...current, [friendId]: false }));
+    setInviteDrafts((current) => {
+      const next = { ...current };
+      delete next[friendId];
+      return next;
+    });
   };
 
   const cancelInviteEdit = (friendId: string) => {
-    const original =
-      activePlan?.friends.find((item) => item.friendId === friendId)
-        ?.invitationText ?? "";
-    setInviteDrafts((current) => ({ ...current, [friendId]: original }));
+    setInviteDrafts((current) => {
+      const next = { ...current };
+      delete next[friendId];
+      return next;
+    });
     setEditingInvite((current) => ({ ...current, [friendId]: false }));
+  };
+
+  const startInviteEdit = (friendId: string, persisted: string) => {
+    setInviteDrafts((current) => ({ ...current, [friendId]: persisted }));
+    setEditingInvite((current) => ({ ...current, [friendId]: true }));
   };
 
   const onPickTone = (friendId: string, tone: InviteTone) => {
     hapticTick();
+    const isEditing = editingInvite[friendId] ?? false;
+    const persisted =
+      activePlan?.friends.find((item) => item.friendId === friendId)
+        ?.invitationText ?? "";
+    const draft = inviteDrafts[friendId];
+    const dirty = isEditing && draft !== undefined && draft !== persisted;
     void resetInvitationSuggested(friendId, tone);
+    if (!dirty) {
+      // Tone updates visible text immediately when not holding a dirty draft.
+      setInviteDrafts((current) => {
+        const next = { ...current };
+        delete next[friendId];
+        return next;
+      });
+    }
     setStyleFriendId(null);
   };
 
@@ -389,6 +408,40 @@ export function PlanDetailScreen() {
       {isDone ? (
         <Card className="gap-3 p-5">
           <Text className="font-sans-bold text-section text-ink">
+            Plan details
+          </Text>
+          <View className="gap-2">
+            <Text className="text-caption font-sans-semibold text-muted">
+              Title
+            </Text>
+            <Text className="text-body text-ink">
+              {activePlan.title.trim() || "—"}
+            </Text>
+            <Text className="text-caption font-sans-semibold text-muted">
+              Activity
+            </Text>
+            <Text className="text-body text-ink">
+              {activePlan.activity.trim() || "—"}
+            </Text>
+            <Text className="text-caption font-sans-semibold text-muted">
+              Place
+            </Text>
+            <Text className="text-body text-ink">
+              {activePlan.place.trim() || "—"}
+            </Text>
+            <Text className="text-caption font-sans-semibold text-muted">
+              Private note
+            </Text>
+            <Text className="text-body text-ink">
+              {activePlan.note.trim() || "—"}
+            </Text>
+          </View>
+        </Card>
+      ) : null}
+
+      {isDone ? (
+        <Card className="gap-3 p-5">
+          <Text className="font-sans-bold text-section text-ink">
             The memory
           </Text>
           {activePlan.memoryPhotoUri ? (
@@ -420,13 +473,39 @@ export function PlanDetailScreen() {
           />
         </Card>
       ) : isCancelled ? (
-        <Card className="gap-2 p-5">
+        <Card className="gap-3 p-5">
           <Text className="font-sans-bold text-section text-ink">
             Cancelled
           </Text>
           <Text className="text-body text-muted">
             This plan is read-only. Make a new invitation when you’re ready.
           </Text>
+          <View className="mt-2 gap-2">
+            <Text className="text-caption font-sans-semibold text-muted">
+              Title
+            </Text>
+            <Text className="text-body text-ink">
+              {activePlan.title.trim() || "—"}
+            </Text>
+            <Text className="text-caption font-sans-semibold text-muted">
+              Activity
+            </Text>
+            <Text className="text-body text-ink">
+              {activePlan.activity.trim() || "—"}
+            </Text>
+            <Text className="text-caption font-sans-semibold text-muted">
+              Place
+            </Text>
+            <Text className="text-body text-ink">
+              {activePlan.place.trim() || "—"}
+            </Text>
+            <Text className="text-caption font-sans-semibold text-muted">
+              Private note
+            </Text>
+            <Text className="text-body text-ink">
+              {activePlan.note.trim() || "—"}
+            </Text>
+          </View>
         </Card>
       ) : (
         <>
@@ -441,8 +520,11 @@ export function PlanDetailScreen() {
               if (!friend) {
                 return null;
               }
-              const draft = inviteDrafts[item.friendId] ?? item.invitationText;
               const isEditing = editingInvite[item.friendId] ?? false;
+              // Persisted invitationText is source of truth when not editing.
+              const visibleText = isEditing
+                ? (inviteDrafts[item.friendId] ?? item.invitationText)
+                : item.invitationText;
               const showStatusLabel = LABEL_STATUSES.includes(item.status);
 
               return (
@@ -462,7 +544,7 @@ export function PlanDetailScreen() {
                     <View className="gap-2">
                       <TextField
                         label="Invitation"
-                        value={draft}
+                        value={visibleText}
                         onChangeText={(text) => {
                           setInviteDrafts((current) => ({
                             ...current,
@@ -484,16 +566,13 @@ export function PlanDetailScreen() {
                     </View>
                   ) : (
                     <View className="gap-2">
-                      <Text className="text-body text-ink">{draft}</Text>
+                      <Text className="text-body text-ink">{visibleText}</Text>
                       {!isTerminal ? (
                         <Button
                           label="Edit message"
                           variant="secondary"
                           onPress={() =>
-                            setEditingInvite((current) => ({
-                              ...current,
-                              [item.friendId]: true,
-                            }))
+                            startInviteEdit(item.friendId, item.invitationText)
                           }
                         />
                       ) : null}
@@ -508,7 +587,7 @@ export function PlanDetailScreen() {
 
                   <Button
                     label={`Share via ${SHARE_OPTIONS.find((option) => option.value === friend.shareMethod)?.label ?? "share"} with ${friend.name}`}
-                    onPress={() => void onShare(item.friendId, draft)}
+                    onPress={() => void onShare(item.friendId, visibleText)}
                   />
 
                   <View className="gap-2">

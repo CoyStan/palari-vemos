@@ -9,7 +9,7 @@ Native Espresso / Compose / Roborazzi / Hilt from those skills do **not** apply 
 | Item | Value |
 | --- | --- |
 | App | So, When? |
-| Package | `com.palarilabs.vemos` |
+| Package | `com.sowhen.myapp` |
 | Stack | Expo RN + TypeScript + NativeWind |
 | Data | Local-first AsyncStorage (`sowhen.v1`) |
 | Backend | None in V1 |
@@ -72,7 +72,7 @@ App is local-first. Confirm core flows with airplane mode on (except OS share ta
 
 - [ ] EAS preview or production AAB/APK signed  
 - [ ] Version / versionCode bumped  
-- [ ] Package `com.palarilabs.vemos` correct  
+- [ ] Package `com.sowhen.myapp` correct  
 
 ### Functional
 
@@ -112,7 +112,7 @@ npm run test:domain
 npm run android          # dev client / Expo Go
 npx eas-cli@latest build --platform android --profile preview
 adb devices
-adb shell pm clear com.palarilabs.vemos
+adb shell pm clear com.sowhen.myapp
 ```
 
 ## Sign-off

@@ -3,7 +3,7 @@
 **Effective date:** July 21, 2026
 
 **App:** So, When?
-**Android package:** `com.palarilabs.vemos`
+**Android package:** `com.sowhen.myapp`
 **Publisher:** Palari Labs, Inc.
 
 ## Who we are

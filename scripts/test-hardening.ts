@@ -841,14 +841,14 @@ async function main() {
     await coord.schedule(enabled, 1);
     assert.equal(io.scheduled.length, firstCount); // same revision: no duplicates
 
-    io.holdNextCancel = true;
-    io.gate = deferred<void>();
+    io.cancelGate = deferred<void>();
     const stale = coord.schedule(enabled, 2);
     await Promise.resolve();
     const resetP = coord.resetAndCancel();
-    io.gate.resolve();
+    io.cancelGate.resolve();
     await resetP;
     await stale;
+    io.cancelGate = null;
     assert.equal(io.scheduled.length, 0);
 
     // Older revision cannot overwrite newer after a fresh schedule

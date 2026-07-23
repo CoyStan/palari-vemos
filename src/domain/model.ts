@@ -344,6 +344,48 @@ export function proposePlanWindow(
   };
 }
 
+/** Build a ConcreteSlot that is not tied to an availability rule. */
+export function makeOneOffSlot(
+  startAt: string | Date,
+  endAt: string | Date,
+  label = "One-off",
+): ConcreteSlot {
+  const start = typeof startAt === "string" ? new Date(startAt) : startAt;
+  const end = typeof endAt === "string" ? new Date(endAt) : endAt;
+  const startMinutes = start.getHours() * 60 + start.getMinutes();
+  const endMinutes = end.getHours() * 60 + end.getMinutes();
+  return {
+    key: `oneoff:${start.toISOString()}`,
+    ruleId: null,
+    date: formatDateKey(start),
+    startMinutes,
+    endMinutes,
+    startAt: start.toISOString(),
+    endAt: end.toISOString(),
+    label,
+  };
+}
+
+/**
+ * Default when for a direct “Make a plan” — tomorrow evening, local time.
+ * Availability remains optional suggestions, not a gate.
+ */
+export function defaultOneOffPlanSlot(
+  now = new Date(),
+  durationMinutes = 60,
+): ConcreteSlot {
+  const start = new Date(now);
+  start.setDate(start.getDate() + 1);
+  start.setHours(18, 0, 0, 0);
+  if (start.getTime() <= now.getTime()) {
+    start.setDate(start.getDate() + 1);
+  }
+  const end = new Date(
+    start.getTime() + Math.max(30, durationMinutes) * 60_000,
+  );
+  return makeOneOffSlot(start, end);
+}
+
 export function slotConflictsWithPlans(
   startAt: string,
   endAt: string,

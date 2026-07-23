@@ -16,10 +16,10 @@ import {
   createPlanState,
   deleteAvailabilityRule,
   lookAroundFirst,
+  logCaughtUpState,
   markInviteSentState,
   markPlanCancelledState,
   markPlanDoneState,
-  logCaughtUpState,
   moveFriendToSlotState,
   plansAffectedByFriendDeletion,
   removeFriend,
@@ -39,6 +39,7 @@ import {
   buildInviteText,
   buildTimeline,
   expandAvailability,
+  makeOneOffSlot,
   proposePlanWindow,
   sortFriendsForPicker,
 } from "../domain/model";
@@ -64,15 +65,20 @@ import {
   startFreshStorage,
 } from "../persistence/storage";
 import { WriteQueue } from "../persistence/writeQueue";
+import { invitationCustomizedAfterShare } from "../domain/invitationUi";
 import {
+  reconcileRemindersOnForeground,
   reminderCoordinator,
   rescheduleReminders,
 } from "../services/reminders";
 import { clearOwnedMediaDirectory } from "../services/media";
 import { shareInviteMessage } from "../services/share";
 
+export type AddFriendForPlanOrigin = "inviteSheet" | "createPlan";
+
 export type TabId = "when" | "friends" | "settings";
 export type WhenMode = "list" | "week" | "months";
+export type NavMotion = "none" | "push" | "pop" | "replace";
 export type ScreenId =
   | "loading"
   | "welcome"
@@ -103,11 +109,16 @@ type AppContextValue = {
   persistError: { op: "save" | "wipe" | "startFresh"; message: string } | null;
   /** @deprecated alias of persistError?.message when op===save — prefer persistError */
   saveError: string | null;
+  /** Reminder API failures — separate from persistence. */
+  reminderError: string | null;
+  dismissReminderError: () => void;
   recoveryWarnings: string[];
   data: AppData;
   now: Date;
   screen: ScreenId;
   tab: TabId;
+  /** How the current screen was reached — drives ScreenTransition. */
+  navMotion: NavMotion;
   selectedSlot: ConcreteSlot | null;
   selectedFriendIds: string[];
   activePlanId: string | null;
@@ -129,7 +140,11 @@ type AppContextValue = {
   goSettings: () => void;
   goBack: () => void;
   openAddFriend: () => void;
-  openAddFriendForPlan: (slot: ConcreteSlot) => void;
+  openAddFriendForPlan: (
+    slot: ConcreteSlot,
+    friendIds?: string[],
+    origin?: AddFriendForPlanOrigin,
+  ) => void;
   openEditFriend: (friendId: string) => void;
   openFriendProfile: (friendId: string) => void;
   openAddAvailability: () => void;
@@ -137,12 +152,15 @@ type AppContextValue = {
   openAvailability: () => void;
   openPrivacyPolicy: () => void;
   openOnboarding: () => void;
+  /** Route to pickPlanTime so availability is optional. */
   openMakePlan: (friendIds?: string[]) => void;
   openCreatePlan: (
     slot: ConcreteSlot,
     friendIds?: string[],
     options?: { replace?: boolean },
   ) => void;
+  /** Update the selected plan window (Create Plan date/time editors). */
+  setSelectedPlanWindow: (startAt: string, endAt: string) => void;
   openPlanDetail: (planId: string) => void;
   openPastPlans: () => void;
   toggleFriendSelection: (friendId: string) => void;
@@ -191,7 +209,8 @@ type AppContextValue = {
   shareInvite: (friendId: string, message: string) => Promise<boolean>;
   confirmInviteSent: (friendId: string, sent: boolean) => Promise<void>;
   markPlanDone: (attendedFriendIds: string[]) => Promise<void>;
-  markPlanStatus: (status: PlanStatus) => Promise<void>;
+  /** Optional planId for When list chips; defaults to activePlanId. */
+  markPlanStatus: (status: PlanStatus, planId?: string) => Promise<void>;
   setPlanCalendarExport: (snapshot: Plan["calendarExport"]) => Promise<void>;
   openMoveFriend: (friendId: string) => void;
   moveFriendToSlot: (
@@ -218,7 +237,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     message: string;
   } | null>(null);
   const saveError = persistError?.op === "save" ? persistError.message : null;
-  const addingFriendForPlanRef = useRef(false);
+  const [reminderError, setReminderError] = useState<string | null>(null);
+  const addingFriendForPlanRef = useRef<AddFriendForPlanOrigin | null>(null);
   const [recoveryWarnings, setRecoveryWarnings] = useState<string[]>([]);
   const [data, setData] = useState<AppData>(emptyAppData);
   const dataRef = useRef(data);
@@ -228,6 +248,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [stack, setStack] = useState<ScreenId[]>(["loading"]);
   const stackRef = useRef(stack);
   stackRef.current = stack;
+  const [navMotion, setNavMotion] = useState<NavMotion>("none");
   const [tab, setTab] = useState<TabId>("when");
   const [selectedSlot, setSelectedSlot] = useState<ConcreteSlot | null>(null);
   const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
@@ -255,19 +276,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const screen: ScreenId = stack[stack.length - 1] ?? "loading";
 
-  const resetTo = useCallback((next: ScreenId) => setStack([next]), []);
-  const push = useCallback(
-    (next: ScreenId) => setStack((current) => [...current, next]),
-    [],
-  );
-  const replaceTop = useCallback(
-    (next: ScreenId) => setStack((current) => [...current.slice(0, -1), next]),
-    [],
-  );
+  const resetTo = useCallback((next: ScreenId) => {
+    setNavMotion("none");
+    setStack([next]);
+  }, []);
+  const push = useCallback((next: ScreenId) => {
+    setNavMotion("push");
+    setStack((current) => [...current, next]);
+  }, []);
+  const replaceTop = useCallback((next: ScreenId) => {
+    setNavMotion("replace");
+    setStack((current) => [...current.slice(0, -1), next]);
+  }, []);
   const goBack = useCallback(() => {
-    setStack((current) =>
-      current.length > 1 ? current.slice(0, -1) : current,
-    );
+    if (stackRef.current.length <= 1) {
+      return;
+    }
+    setNavMotion("pop");
+    setStack((current) => current.slice(0, -1));
   }, []);
 
   useEffect(() => {
@@ -281,11 +307,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => sub.remove();
   }, [goBack]);
 
+  const syncReminderError = useCallback(() => {
+    setReminderError(reminderCoordinator.error);
+  }, []);
+
   useEffect(() => {
     const sub = AppState.addEventListener("change", (state) => {
       if (state === "active") {
         setNowTick(Date.now());
-        void rescheduleReminders(dataRef.current, revisionRef.current);
+        if (reminderCoordinator.isResetting) return;
+        void reconcileRemindersOnForeground(
+          dataRef.current,
+          revisionRef.current,
+        ).then(syncReminderError);
       }
     });
     const midnight = setInterval(() => setNowTick(Date.now()), 60_000);
@@ -293,7 +327,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       sub.remove();
       clearInterval(midnight);
     };
-  }, []);
+  }, [syncReminderError]);
 
   const clearSelectionState = useCallback(() => {
     setSelectedSlot(null);
@@ -322,6 +356,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         // Latest-snapshot-wins: only schedule if this revision is still current.
         if (revision === revisionRef.current) {
           await rescheduleReminders(next, revision);
+          setReminderError(reminderCoordinator.error);
         }
       });
       setPersistError(
@@ -349,7 +384,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setTab("when");
       setReady(true);
       revisionRef.current += 1;
-      void rescheduleReminders(loaded.data, revisionRef.current);
+      void rescheduleReminders(loaded.data, revisionRef.current).then(
+        syncReminderError,
+      );
       const referenced = [
         ...loaded.data.friends.map((friend) => friend.photoUri),
         ...loaded.data.plans.map((plan) => plan.memoryPhotoUri),
@@ -362,11 +399,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setReady(true);
       resetTo("recovery");
     }
-  }, [resetTo]);
+  }, [resetTo, syncReminderError]);
 
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
+
+  const dismissReminderError = useCallback(() => {
+    setReminderError(null);
+  }, []);
 
   const slots = useMemo(
     () =>
@@ -430,13 +471,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [resetTo]);
 
   const openAddFriend = useCallback(() => {
-    addingFriendForPlanRef.current = false;
+    addingFriendForPlanRef.current = null;
     setActiveFriendId(null);
     push("addFriend");
   }, [push]);
 
   const openAddFriendForPlan = useCallback(
-    (slot: ConcreteSlot) => {
+    (
+      slot: ConcreteSlot,
+      friendIds?: string[],
+      origin: AddFriendForPlanOrigin = "inviteSheet",
+    ) => {
       const window = proposePlanWindow(
         slot.startAt,
         slot.endAt,
@@ -454,7 +499,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
           new Date(window.endAt).getMinutes(),
       };
       setSelectedSlot(proposed);
-      addingFriendForPlanRef.current = true;
+      if (friendIds) {
+        setSelectedFriendIds(friendIds);
+      }
+      addingFriendForPlanRef.current = origin;
       setActiveFriendId(null);
       push("addFriend");
     },
@@ -539,6 +587,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [push, replaceTop],
   );
 
+  const setSelectedPlanWindow = useCallback(
+    (startAt: string, endAt: string) => {
+      setSelectedSlot(makeOneOffSlot(startAt, endAt));
+    },
+    [],
+  );
+
   const openPlanDetail = useCallback(
     (planId: string) => {
       setActivePlanId(planId);
@@ -583,6 +638,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (friendId) {
         setActiveFriendId(friendId);
         if (stackRef.current.includes("friendProfile")) {
+          setNavMotion("replace");
           setStack((current) => {
             const profileIdx = current.lastIndexOf("friendProfile");
             return profileIdx >= 0
@@ -595,14 +651,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (forPlan && createdId && selectedSlot) {
+        const origin = addingFriendForPlanRef.current;
         setSelectedFriendIds((ids) =>
           ids.includes(createdId!) ? ids : [...ids, createdId!],
         );
-        addingFriendForPlanRef.current = false;
-        replaceTop("createPlan");
+        addingFriendForPlanRef.current = null;
+        if (origin === "createPlan") {
+          goBack();
+        } else {
+          // From InviteSheet or pickPlanTime: enter CreatePlan exactly once.
+          replaceTop("createPlan");
+        }
         return;
       }
-      addingFriendForPlanRef.current = false;
+      addingFriendForPlanRef.current = null;
       goBack();
     },
     [commit, goBack, replaceTop, selectedSlot, writeQueue],
@@ -776,9 +838,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           };
           const timeOrPlaceChanged = Boolean(
             patch.startAt ||
-            patch.endAt ||
-            patch.activity !== undefined ||
-            patch.place !== undefined,
+              patch.endAt ||
+              patch.activity !== undefined ||
+              patch.place !== undefined,
           );
           if (timeOrPlaceChanged) {
             updated.friends = updated.friends.map((item) => {
@@ -880,15 +942,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const shareInvite = useCallback(
     async (friendId: string, message: string) => {
+      // Persist the exact visible text; do not mark unchanged generated text custom.
       if (activePlanId) {
         await commit((current) => {
           const plan = current.plans.find((item) => item.id === activePlanId);
           const existing = plan?.friends.find(
             (item) => item.friendId === friendId,
           );
-          const customized =
-            Boolean(existing?.invitationCustomized) ||
-            (existing?.invitationText ?? "") !== message;
+          const customized = invitationCustomizedAfterShare(existing, message);
           return updateInvitationTextState(
             current,
             activePlanId,
@@ -931,27 +992,48 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const markPlanStatus = useCallback(
-    async (status: PlanStatus) => {
-      if (!activePlanId) return;
+    async (status: PlanStatus, planId?: string) => {
+      const targetId = planId ?? activePlanId;
+      if (!targetId) return;
       if (status === "cancelled") {
-        await commit((current) =>
-          markPlanCancelledState(current, activePlanId),
-        );
-        goWhen();
+        await commit((current) => markPlanCancelledState(current, targetId));
+        if (!planId) {
+          goWhen();
+        }
         return;
       }
       if (status === "done") {
+        const plan = dataRef.current.plans.find((item) => item.id === targetId);
+        if (!plan) return;
+        const yesIds = plan.friends
+          .filter((item) => item.status === "yes")
+          .map((item) => item.friendId);
+        const fallbackIds = plan.friends
+          .filter((item) => item.status !== "moved")
+          .map((item) => item.friendId);
+        await commit((current) =>
+          markPlanDoneState(
+            current,
+            targetId,
+            yesIds.length > 0 ? yesIds : fallbackIds,
+          ),
+        );
+        if (!planId) {
+          goWhen();
+        }
         return;
       }
       await commit((current) => ({
         ...current,
         plans: current.plans.map((plan) =>
-          plan.id === activePlanId
+          plan.id === targetId
             ? { ...plan, status, updatedAt: new Date().toISOString() }
             : plan,
         ),
       }));
-      goWhen();
+      if (!planId) {
+        goWhen();
+      }
     },
     [activePlanId, commit, goWhen],
   );
@@ -1010,6 +1092,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       setMoveFriendId(null);
       setActivePlanId(newPlanId);
+      setNavMotion("replace");
       setStack(["when", "planDetail"]);
       return { ok: true };
     },
@@ -1031,15 +1114,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const wipeData = useCallback(async () => {
     try {
       await writeQueue.runExclusive(async () => {
-        await reminderCoordinator.resetAndCancel();
-        await clearAppData();
-        await clearOwnedMediaDirectory();
+        await reminderCoordinator.resetAndCancel({
+          afterBarrierRaised: async () => {
+            await clearAppData();
+            await clearOwnedMediaDirectory();
+          },
+        });
       });
       const empty = emptyAppData();
       dataRef.current = empty;
       setData(empty);
       clearSelectionState();
       setPersistError(null);
+      setReminderError(null);
       setRecoveryWarnings([]);
       resetTo("welcome");
       setTab("when");
@@ -1063,6 +1150,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return;
       if (revision === revisionRef.current) {
         await rescheduleReminders(snapshot, revision);
+        setReminderError(reminderCoordinator.error);
       }
     });
     setPersistError(
@@ -1073,9 +1161,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const startFresh = useCallback(async () => {
     try {
       await writeQueue.runExclusive(async () => {
-        await reminderCoordinator.resetAndCancel();
-        await startFreshStorage();
-        await clearOwnedMediaDirectory();
+        await reminderCoordinator.resetAndCancel({
+          afterBarrierRaised: async () => {
+            await startFreshStorage();
+            await clearOwnedMediaDirectory();
+          },
+        });
       });
       const empty = emptyAppData();
       dataRef.current = empty;
@@ -1083,6 +1174,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       clearSelectionState();
       setLoadError(null);
       setPersistError(null);
+      setReminderError(null);
       setRecoveryWarnings([]);
       resetTo("welcome");
       return { ok: true };
@@ -1126,11 +1218,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       loadError,
       persistError,
       saveError,
+      reminderError,
+      dismissReminderError,
       recoveryWarnings,
       data,
       now,
       screen,
       tab,
+      navMotion,
       selectedSlot,
       selectedFriendIds,
       activePlanId,
@@ -1162,6 +1257,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       openOnboarding,
       openMakePlan,
       openCreatePlan,
+      setSelectedPlanWindow,
       openPlanDetail,
       openPastPlans,
       toggleFriendSelection,
@@ -1204,11 +1300,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       loadError,
       persistError,
       saveError,
+      reminderError,
+      dismissReminderError,
       recoveryWarnings,
       data,
       now,
       screen,
       tab,
+      navMotion,
       selectedSlot,
       selectedFriendIds,
       activePlanId,
@@ -1239,6 +1338,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       openOnboarding,
       openMakePlan,
       openCreatePlan,
+      setSelectedPlanWindow,
       openPlanDetail,
       openPastPlans,
       toggleFriendSelection,

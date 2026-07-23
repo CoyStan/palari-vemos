@@ -15,6 +15,7 @@ import { BottomNav } from "./src/components/BottomNav";
 import { MuiPickerProvider } from "./src/components/MuiPickerProvider";
 import { SaveErrorBanner } from "./src/components/SaveErrorBanner";
 import { ScreenTransition } from "./src/components/ScreenTransition";
+import { TabPane } from "./src/components/TabPane";
 import { color } from "./src/foundation";
 import { AddAvailabilityScreen } from "./src/screens/AddAvailabilityScreen";
 import { AvailabilityScreen } from "./src/screens/AvailabilityScreen";
@@ -32,10 +33,56 @@ import { RecoveryScreen } from "./src/screens/RecoveryScreen";
 import { SettingsScreen } from "./src/screens/SettingsScreen";
 import { WelcomeScreen } from "./src/screens/WelcomeScreen";
 import { WhenScreen } from "./src/screens/WhenScreen";
-import { AppProvider, useApp } from "./src/state/AppProvider";
+import { AppProvider, useApp, type ScreenId } from "./src/state/AppProvider";
+
+function renderStackScreen(screen: ScreenId) {
+  switch (screen) {
+    case "welcome":
+      return <WelcomeScreen />;
+    case "addFriend":
+      return <FriendFormScreen key="create" mode="create" />;
+    case "editFriend":
+      return <FriendFormScreen key="edit" mode="edit" />;
+    case "friendProfile":
+      return <FriendProfileScreen />;
+    case "addAvailability":
+      return <AddAvailabilityScreen key="add" />;
+    case "editAvailability":
+      return <AddAvailabilityScreen key="edit" />;
+    case "availability":
+      return <AvailabilityScreen />;
+    case "onboarding":
+      return <OnboardingScreen />;
+    case "recovery":
+      return <RecoveryScreen />;
+    case "createPlan":
+      return <CreatePlanScreen />;
+    case "pickPlanTime":
+      return <PickPlanTimeScreen />;
+    case "planDetail":
+      return <PlanDetailScreen />;
+    case "moveFriend":
+      return <MoveFriendScreen />;
+    case "pastPlans":
+      return <PastPlansScreen />;
+    case "privacyPolicy":
+      return <PrivacyPolicyScreen />;
+    case "loading":
+      return null;
+    // Tab roots are rendered separately (keep-alive). Fallback only.
+    case "friends":
+      return <FriendsScreen />;
+    case "settings":
+      return <SettingsScreen />;
+    case "when":
+    default:
+      return <WhenScreen />;
+  }
+}
 
 function Root() {
-  const { ready, screen, tab, goWhen, goFriends, goSettings } = useApp();
+  const { ready, screen, tab, navMotion, goWhen, goFriends, goSettings } =
+    useApp();
 
   if (!ready || screen === "loading") {
     return (
@@ -46,74 +93,43 @@ function Root() {
     );
   }
 
-  const showTabs =
+  const isTabRoot =
     screen === "when" || screen === "friends" || screen === "settings";
 
-  let content = null;
-  switch (screen) {
-    case "welcome":
-      content = <WelcomeScreen />;
-      break;
-    case "addFriend":
-      content = <FriendFormScreen key="create" mode="create" />;
-      break;
-    case "editFriend":
-      content = <FriendFormScreen key="edit" mode="edit" />;
-      break;
-    case "friendProfile":
-      content = <FriendProfileScreen />;
-      break;
-    case "addAvailability":
-      content = <AddAvailabilityScreen key="add" />;
-      break;
-    case "editAvailability":
-      content = <AddAvailabilityScreen key="edit" />;
-      break;
-    case "availability":
-      content = <AvailabilityScreen />;
-      break;
-    case "onboarding":
-      content = <OnboardingScreen />;
-      break;
-    case "recovery":
-      content = <RecoveryScreen />;
-      break;
-    case "createPlan":
-      content = <CreatePlanScreen />;
-      break;
-    case "pickPlanTime":
-      content = <PickPlanTimeScreen />;
-      break;
-    case "planDetail":
-      content = <PlanDetailScreen />;
-      break;
-    case "moveFriend":
-      content = <MoveFriendScreen />;
-      break;
-    case "pastPlans":
-      content = <PastPlansScreen />;
-      break;
-    case "privacyPolicy":
-      content = <PrivacyPolicyScreen />;
-      break;
-    case "friends":
-      content = <FriendsScreen />;
-      break;
-    case "settings":
-      content = <SettingsScreen />;
-      break;
-    case "when":
-    default:
-      content = <WhenScreen />;
-      break;
-  }
-
   return (
-    <View className="flex-1 bg-canvas font-sans">
-      <View className="flex-1">
-        <ScreenTransition screenKey={screen}>{content}</ScreenTransition>
+    <View className="flex-1 bg-canvas font-sans" style={{ overflow: "hidden" }}>
+      {/*
+        Tab peers: keep mounted, plain visibility swap, no ScreenTransition.
+        Avoids opacity/slide flashes (teal “green squares”) on every tab tap.
+      */}
+      <View
+        style={{
+          flex: 1,
+          display: isTabRoot ? "flex" : "none",
+          overflow: "hidden",
+        }}
+        pointerEvents={isTabRoot ? "auto" : "none"}
+      >
+        <TabPane active={tab === "when"}>
+          <WhenScreen />
+        </TabPane>
+        <TabPane active={tab === "friends"}>
+          <FriendsScreen />
+        </TabPane>
+        <TabPane active={tab === "settings"}>
+          <SettingsScreen />
+        </TabPane>
       </View>
-      {showTabs ? (
+
+      {!isTabRoot ? (
+        <View style={{ flex: 1, overflow: "hidden" }}>
+          <ScreenTransition screenKey={screen} motion={navMotion}>
+            {renderStackScreen(screen)}
+          </ScreenTransition>
+        </View>
+      ) : null}
+
+      {isTabRoot ? (
         <BottomNav
           active={tab}
           onWhen={goWhen}
