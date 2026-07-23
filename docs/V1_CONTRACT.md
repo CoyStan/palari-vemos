@@ -271,11 +271,11 @@ friend. Local notifications are one-shot, so schedule a short fading series.
 
 **Acceptance.**
 
-- [ ] Tests in `scripts/test-domain.ts`: 4 specs when one friend is due
+- [x] Tests in `scripts/test-domain.ts`: 4 specs when one friend is due
       (7 days apart, 11:00); rotation across 2+ due friends; most-overdue
       ordering; `showReminderNames: false` stays generic; total ≤ 32 with many
       plans + due friends.
-- [ ] `src/services/reminders.ts` / `reminderCoordinator` need no interface
+- [x] `src/services/reminders.ts` / `reminderCoordinator` need no interface
       change (specs in/notifications out) — verify.
 
 ## WP6 — "Add to calendar" handoff + stale-copy hint
@@ -427,3 +427,7 @@ render path found in evaluation.
 - Day sheet adds section labels (“Caught up”, “Plans you did”, “Coming up”)
   for clarity; content matches the contract.
 - `WhenCalendar` is week-only (removed `mode` / `onSwitchToDay`).
+
+### WP5
+- Catch-up keys use local `formatDateKey(triggerAt)` (was UTC ISO slice) so
+  the date matches the local 11:00 trigger day.

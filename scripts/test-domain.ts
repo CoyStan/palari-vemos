@@ -372,6 +372,113 @@ const specs = buildReminderSpecs(
 assert.ok(specs.length >= 1);
 assert.ok(specs.every((s) => !s.body.toLowerCase().includes("ana")));
 
+// Catch-up reminder series (docs/V1_CONTRACT.md WP5).
+const reminderNow = new Date(2026, 6, 22, 12, 0);
+const seriesBase = {
+  ...emptyAppData(),
+  settings: {
+    ...emptyAppData().settings,
+    notificationsEnabled: true,
+    notifyCatchUpDue: true,
+    notifyPlanTomorrow: false,
+    notifyAskIfHappened: false,
+    showReminderNames: true,
+  },
+  friends: [
+    friend({
+      id: "overdue-a",
+      name: "Ana",
+      rhythm: "weekly",
+      lastMetAt: startOfDay(new Date(2026, 5, 1)).toISOString(),
+      createdAt: startOfDay(new Date(2026, 4, 1)).toISOString(),
+    }),
+  ],
+};
+const series = buildReminderSpecs(seriesBase, reminderNow).filter((s) =>
+  s.key.startsWith("catchup:"),
+);
+assert.equal(series.length, 4);
+for (let i = 0; i < 4; i += 1) {
+  const trigger = series[i]!.triggerAt;
+  assert.equal(trigger.getHours(), 11);
+  assert.equal(trigger.getMinutes(), 0);
+  if (i > 0) {
+    const prev = series[i - 1]!.triggerAt;
+    assert.equal((trigger.getTime() - prev.getTime()) / 86_400_000, 7);
+  }
+  assert.equal(series[i]!.body.includes("Ana"), true);
+}
+
+const rotated = buildReminderSpecs(
+  {
+    ...seriesBase,
+    friends: [
+      friend({
+        id: "old",
+        name: "Zoe",
+        rhythm: "weekly",
+        lastMetAt: startOfDay(new Date(2026, 4, 1)).toISOString(),
+        createdAt: startOfDay(new Date(2026, 3, 1)).toISOString(),
+      }),
+      friend({
+        id: "newer",
+        name: "Ana",
+        rhythm: "weekly",
+        lastMetAt: startOfDay(new Date(2026, 6, 1)).toISOString(),
+        createdAt: startOfDay(new Date(2026, 5, 1)).toISOString(),
+      }),
+    ],
+  },
+  reminderNow,
+).filter((s) => s.key.startsWith("catchup:"));
+assert.equal(rotated.length, 4);
+assert.equal(rotated[0]!.body.includes("Zoe"), true);
+assert.equal(rotated[1]!.body.includes("Ana"), true);
+assert.equal(rotated[2]!.body.includes("Zoe"), true);
+assert.equal(rotated[3]!.body.includes("Ana"), true);
+
+const genericCatchUps = buildReminderSpecs(
+  {
+    ...seriesBase,
+    settings: { ...seriesBase.settings, showReminderNames: false },
+  },
+  reminderNow,
+).filter((s) => s.key.startsWith("catchup:"));
+assert.ok(genericCatchUps.every((s) => !s.body.toLowerCase().includes("ana")));
+
+const capped = buildReminderSpecs(
+  {
+    ...emptyAppData(),
+    settings: {
+      ...emptyAppData().settings,
+      notificationsEnabled: true,
+      notifyPlanTomorrow: true,
+      notifyAskIfHappened: true,
+      notifyCatchUpDue: true,
+      showReminderNames: false,
+    },
+    friends: Array.from({ length: 8 }, (_, i) =>
+      friend({
+        id: `f${i}`,
+        name: `Friend ${i}`,
+        rhythm: "weekly",
+        lastMetAt: startOfDay(new Date(2026, 4, 1)).toISOString(),
+        createdAt: startOfDay(new Date(2026, 3, 1)).toISOString(),
+      }),
+    ),
+    plans: Array.from({ length: 40 }, (_, i) => ({
+      ...plan710,
+      id: `plan-${i}`,
+      title: `Plan ${i}`,
+      startAt: new Date(2026, 6, 24 + (i % 20), 19, 0).toISOString(),
+      endAt: new Date(2026, 6, 24 + (i % 20), 20, 0).toISOString(),
+      status: "on" as const,
+    })),
+  },
+  reminderNow,
+);
+assert.ok(capped.length <= 32);
+
 // Months view aggregation (docs/V1_CONTRACT.md WP4 seed).
 const doneJuly18: Plan = {
   ...plan710,
