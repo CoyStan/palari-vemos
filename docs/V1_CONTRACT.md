@@ -90,14 +90,14 @@ requested."
 
 **Acceptance.**
 
-- [ ] `expo-contacts` absent from `package.json` and `package-lock.json`.
-- [ ] No source reference to `expo-contacts` or `pickOneContact` remains
+- [x] `expo-contacts` absent from `package.json` and `package-lock.json`.
+- [x] No source reference to `expo-contacts` or `pickOneContact` remains
       (`grep -ri "expo-contacts\|pickOneContact" src App.tsx` is empty).
-- [ ] `npx expo prebuild --platform android --no-install` produces a manifest
+- [x] `npx expo prebuild --platform android --no-install` produces a manifest
       with **no** `READ_CONTACTS` (then delete `android/` and revert any
       prebuild side effects, e.g. `package.json` script rewrites).
-- [ ] `npm run sync:privacy` passes; policy files contain no contacts wording.
-- [ ] Onboarding, add-friend, and friends screens compile and flow manually
+- [x] `npm run sync:privacy` passes; policy files contain no contacts wording.
+- [x] Onboarding, add-friend, and friends screens compile and flow manually
       (welcome → onboarding → add friend by name → When).
 
 ## WP2 — Schema v4: catch-up log + calendar-export snapshot
@@ -404,4 +404,9 @@ render path found in evaluation.
 
 ## Implementation notes (append during execution)
 
-_(empty — filled by the implementing agent)_
+### WP1
+- Prebuild still lists `READ_CONTACTS` with `tools:node="remove"` via
+  `blockedPermissions` (defense in depth). No plugin grants it; DoD treats
+  `tools:node="remove"` as clean.
+- Kept media `kind` as `"friend" | "memory"` only (dropped unused `"contact"`).
+- `.cursor/rules/vemos.mdc` updated to match AGENTS.md (no contact picker).

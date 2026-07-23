@@ -175,9 +175,8 @@ export function SettingsScreen() {
         <Section title="Privacy & data">
           <Text className="text-body text-muted">
             So, When? stores friends, availability, and plans only on this
-            device. Friends do not need the app. Contacts are never scanned or
-            uploaded — you choose one contact at a time when you want to copy a
-            name or number.
+            device. Friends do not need the app. Add friends by typing a name —
+            nothing is scanned or uploaded from your address book.
           </Text>
           <Button
             label="Privacy policy"

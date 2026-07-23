@@ -19,6 +19,7 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [],
       "blockedPermissions": [
+        "android.permission.READ_CONTACTS",
         "android.permission.WRITE_CONTACTS",
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
@@ -31,7 +32,6 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.palarilabs.vemos",
       "infoPlist": {
-        "NSContactsUsageDescription": "So, When? only copies the single contact you choose. Your address book is never scanned or uploaded.",
         "NSPhotoLibraryUsageDescription": "Add an optional photo for a friend you want to see."
       }
     },
@@ -45,12 +45,6 @@
     },
     "plugins": [
       "expo-font",
-      [
-        "expo-contacts",
-        {
-          "contactsPermission": "So, When? only copies the single contact you choose. Your address book is never scanned or uploaded."
-        }
-      ],
       [
         "expo-image-picker",
         {

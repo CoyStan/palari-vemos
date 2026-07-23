@@ -18,10 +18,6 @@ So, When? does not require an account and does not operate a So, When? backend t
 
 Depending on how you use the app, So, When? may store locally: friend names and optional phone numbers, preferred share methods, catch-up rhythms, and last-caught-up dates; optional photos for friends or plan memories (copied into app-owned storage when possible); availability rules and skipped occurrences; plans (time, activity, place, private notes) and per-friend invitation text and reply statuses; and settings such as reminder preferences and display defaults. Android backup for app data is disabled in this release.
 
-## Contacts
-
-If you use the contact picker, the operating system lets you choose a single contact. So, When? may copy only the name, phone number, and photo you select into a friend record on your device. The app does not scan, upload, or sync your full address book.
-
 ## Photos and app-owned media
 
 If you grant photo permission, you may attach an optional photo for a friend or a plan memory. Selected images are copied into an app-owned folder when the platform allows it. Replacing or removing a photo deletes the previous app-owned file when it was managed by So, When?. We do not upload photos to Palari Labs servers.
@@ -48,7 +44,7 @@ So, When? is not directed to children under 13. Because this release keeps data 
 
 ## Your choices
 
-You can deny contacts, photos, or notification permissions; use the app without those features; export or wipe data in Settings; and uninstall the app at any time.
+You can deny photos or notification permissions; use the app without those features; export or wipe data in Settings; and uninstall the app at any time.
 
 ## Changes
 

@@ -7,8 +7,6 @@ import { ScreenHeader } from "../components/ScreenHeader";
 import { TextField } from "../components/TextField";
 import type { AvailabilityKind, Recurrence } from "../domain/types";
 import { formatDateKey } from "../domain/time";
-import { pickOneContact } from "../services/contacts";
-import { copyIntoOwnedMedia } from "../services/media";
 import { hapticTick } from "../services/haptics";
 import {
   useApp,
@@ -66,15 +64,11 @@ const QUICK_SLOTS: QuickSlot[] = [
   },
 ];
 
-function defaultFriend(
-  name: string,
-  phone = "",
-  photoUri: string | null = null,
-): FriendInput {
+function defaultFriend(name: string): FriendInput {
   return {
     name,
-    photoUri,
-    phone,
+    photoUri: null,
+    phone: "",
     shareMethod: "message",
     rhythm: "monthly",
     customDays: 45,
@@ -86,8 +80,6 @@ export function OnboardingScreen() {
   const { completeOnboarding, goBack } = useApp();
   const [step, setStep] = useState<"friend" | "availability">("friend");
   const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>("weeknights");
   const [saving, setSaving] = useState(false);
 
@@ -97,25 +89,12 @@ export function OnboardingScreen() {
     return formatDateKey(d);
   }, []);
 
-  const onPickContact = async () => {
-    const contact = await pickOneContact();
-    if (!contact) return;
-    setName(contact.name);
-    setPhone(contact.phone ?? "");
-    if (contact.photoUri) {
-      const owned = await copyIntoOwnedMedia(contact.photoUri, "contact");
-      if (owned.ok) {
-        setPhotoUri(owned.uri);
-      }
-    }
-  };
-
   const finish = async (availability: AvailabilityInput | null) => {
     if (!name.trim()) return;
     setSaving(true);
     try {
       await completeOnboarding({
-        friend: defaultFriend(name, phone, photoUri),
+        friend: defaultFriend(name),
         availability,
       });
     } finally {
@@ -157,18 +136,13 @@ export function OnboardingScreen() {
         <Text className="text-body text-muted">
           A name is enough. You can add a number or photo later.
         </Text>
-        <Button
-          label="Choose one contact"
-          variant="secondary"
-          onPress={() => void onPickContact()}
-        />
         <TextField
           label="Friend’s name"
           value={name}
           onChangeText={setName}
           autoCapitalize="words"
           accessibilityLabel="Friend’s name"
-          accessibilityHint="Type a name if you prefer not to use contacts"
+          accessibilityHint="Type a first name or nickname"
         />
         <Button
           label="Continue"

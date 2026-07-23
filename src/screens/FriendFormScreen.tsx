@@ -1,17 +1,15 @@
 import { useMemo, useState } from "react";
-import { Alert, Platform, Pressable, Text, View } from "react-native";
+import { Alert, Pressable, Text, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 
 import { Avatar } from "../components/Avatar";
 import { Button } from "../components/Button";
-import { Card } from "../components/Card";
 import { ChoiceRow } from "../components/ChoiceRow";
 import { Screen } from "../components/Screen";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { TextField } from "../components/TextField";
 import { RHYTHM_OPTIONS, SHARE_OPTIONS } from "../domain/model";
 import type { CatchUpRhythm, ShareMethod } from "../domain/types";
-import { pickOneContact } from "../services/contacts";
 import { copyIntoOwnedMedia } from "../services/media";
 import { useApp } from "../state/AppProvider";
 
@@ -45,7 +43,6 @@ export function FriendFormScreen({ mode }: Props) {
     String(existing?.customDays ?? 45),
   );
   const [saving, setSaving] = useState(false);
-  const [picking, setPicking] = useState(false);
 
   const rhythmOptions = useMemo(
     () =>
@@ -58,7 +55,7 @@ export function FriendFormScreen({ mode }: Props) {
 
   const ownPhoto = async (
     sourceUri: string | null | undefined,
-    kind: "friend" | "contact",
+    kind: "friend",
     mimeType?: string | null,
   ): Promise<string | null> => {
     if (!sourceUri) return null;
@@ -68,36 +65,6 @@ export function FriendFormScreen({ mode }: Props) {
       return null;
     }
     return copied.uri;
-  };
-
-  const onPickContact = async () => {
-    if (Platform.OS === "web") {
-      Alert.alert("Contacts", "Contact picking works on Android and iOS.");
-      return;
-    }
-    setPicking(true);
-    try {
-      const picked = await pickOneContact();
-      if (!picked) {
-        return;
-      }
-      setName(picked.name);
-      setPhone(picked.phone);
-      if (picked.photoUri) {
-        const owned = await ownPhoto(picked.photoUri, "contact");
-        if (owned) {
-          setPhotoUri(owned);
-        }
-        // Keep existing photo if contact has none or copy fails.
-      }
-    } catch {
-      Alert.alert(
-        "Could not open contacts",
-        "You can still add a friend by typing a name.",
-      );
-    } finally {
-      setPicking(false);
-    }
   };
 
   const onPickPhoto = async () => {
@@ -178,27 +145,6 @@ export function FriendFormScreen({ mode }: Props) {
         title={mode === "edit" ? "Edit friend" : "Add a friend"}
         onBack={goBack}
       />
-
-      {mode === "create" ? (
-        <Card className="gap-3">
-          <Text className="font-sans-bold text-section text-ink">
-            Two easy ways to add
-          </Text>
-          <Button
-            label="Choose from contacts"
-            variant="secondary"
-            loading={picking}
-            onPress={() => void onPickContact()}
-          />
-          <Text className="text-caption text-muted">
-            We only copy the one contact you pick. Your contacts stay on your
-            phone.
-          </Text>
-          <Text className="text-center text-caption font-sans-semibold text-muted">
-            or just type a name below
-          </Text>
-        </Card>
-      ) : null}
 
       <View className="items-center gap-3">
         <Avatar name={name || "Friend"} photoUri={photoUri} size={72} />

@@ -10,7 +10,6 @@ So, When? is the tiny Palari Labs, Inc. app that turns “we should catch up som
 - On-device persistence with AsyncStorage (`sowhen.v1`)
 - Typography: Quicksand · Icons: Feather (`@expo/vector-icons`)
 - Optional local reminders via `expo-notifications`
-- Single-contact picker via `expo-contacts` (`Contact.presentPicker`)
 
 ## Open in Cursor
 
@@ -24,7 +23,7 @@ So, When? is the tiny Palari Labs, Inc. app that turns “we should catch up som
 Three tabs:
 
 1. **When** — next 2–3 weeks of free times and plans; FAB to add availability
-2. **Friends** — people you want to see; manual add or one contact from the OS picker
+2. **Friends** — people you want to see; add by typing a name
 3. **Settings** — quiet reminders, defaults, privacy, export / wipe
 
 ## Styling

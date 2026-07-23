@@ -9,7 +9,7 @@ This document does **not** certify Play approval. Google Play Review has final a
 
 - On-device AsyncStorage persistence (`sowhen.v1` / schemaVersion) stores friends, plans, and settings locally.
 - No first-party network backend, analytics, or ads SDKs are part of this release’s intended surface.
-- Optional OS contact picker and photo picker copy selected items on-device.
+- Optional photo picker copies selected images on-device.
 - Optional local notifications only.
 - Do not treat an on-device friend name as “collected by Palari Labs” for Data safety “shared” claims.
 - Update this file whenever permissions or data flows change.

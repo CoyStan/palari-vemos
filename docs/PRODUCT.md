@@ -17,12 +17,12 @@ Use **friend**, **availability**, **plan**, **invitation**, and **catch-up rhyth
 | Tab | Job | Primary action |
 | --- | --- | --- |
 | When | Next 2–3 weeks as a list, plus week/day calendar of free times and plans | Tap a free slot / FAB + |
-| Friends | Grid/list of people you want to see | Add manually or from contacts |
+| Friends | Grid/list of people you want to see | Add by typing a name |
 | Settings | Reminders, defaults, privacy, export/wipe | Toggle quiet local reminders |
 
 ## Supporting flows
 
-- Add/edit friend (manual or single-contact picker)
+- Add/edit friend (manual name entry)
 - Friend profile (rhythm, last met, plans)
 - Add availability (presets, recurring, one-time)
 - Create plan (multi-friend picker → details)

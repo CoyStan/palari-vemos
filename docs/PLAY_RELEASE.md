@@ -40,11 +40,9 @@ npx eas-cli@latest build --platform android --profile preview
 
 Wordmark: teal **So,** stacked above ink **When?** in Quicksand Bold on warm canvas.
 
-## Contact permission release blocker
+## Contact permission — resolved
 
-`expo prebuild` currently emits **`android.permission.READ_CONTACTS`** (from `expo-contacts`) while WRITE_CONTACTS / media / camera are removed via `blockedPermissions`.
-
-Single-contact `Contact.presentPicker()` is still used. Until Play Data safety + the privacy policy can honestly describe that permission (or Expo proves picker-only without READ_CONTACTS on target API levels), treat **READ_CONTACTS as an explicit release blocker** — do not remove contact import silently.
+Contact import was removed for v0.2. Friends are added by typing a name only. `expo-contacts` is gone; `READ_CONTACTS` is listed in `android.blockedPermissions` so a prebuild cannot reintroduce it.
 
 ## Preview APK test checklist (physical Android)
 
@@ -53,8 +51,7 @@ Before calling an internal release ready, install the preview APK and verify:
 - [ ] Fresh install → welcome/onboarding
 - [ ] Upgrade from previous install → data loads (or recovery if corrupt)
 - [ ] Add friend manually
-- [ ] Contact picker (single contact) → name/phone; photo optional
-- [ ] Gallery friend photo + contact photo + plan memory photo survive **relaunch**
+- [ ] Gallery friend photo + plan memory photo survive **relaunch**
 - [ ] Process death (force-stop) → state restored from primary/backup
 - [ ] Invitation share sheet; edit text; Yes/Maybe/No preserved when dismissing send confirm
 - [ ] JSON export share and **cancel** (temp file cleaned)
@@ -71,4 +68,4 @@ Before calling an internal release ready, install the preview APK and verify:
 4. Run: `npx eas-cli@latest submit --platform android --profile production`
 5. Start in the internal track, then promote only after testing and automated checks pass.
 
-Do not claim no data collected if analytics, crash reporting, accounts, contact import, or remote services are introduced later. Update Play forms and the privacy policy with every data-flow change.
+Do not claim no data collected if analytics, crash reporting, accounts, or remote services are introduced later. Update Play forms and the privacy policy with every data-flow change.

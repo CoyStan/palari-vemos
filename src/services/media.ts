@@ -37,7 +37,7 @@ async function ensureMediaDir(): Promise<string | null> {
 
 export async function copyIntoOwnedMedia(
   sourceUri: string,
-  kind: "friend" | "memory" | "contact",
+  kind: "friend" | "memory",
   mimeType?: string | null,
 ): Promise<MediaCopyResult> {
   if (Platform.OS === "web") {

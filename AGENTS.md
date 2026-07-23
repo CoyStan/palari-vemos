@@ -13,11 +13,11 @@ Friends do not need So, When?, an account, or an invitation link. Version 1 is a
 - Start with `npm install`, then `npm run android`.
 - Keep the first release local-first: no account, backend, OAuth, payments, analytics, or remote database without an explicit decision.
 - Use Expo modules and the native share sheet. Do not build a messaging system.
-- Keep friend data on-device. Prefer the native contact picker for a **single** contact — never scan or upload the address book.
+- Keep friend data on-device. Add friends by typing a name — never scan or upload the address book.
 
 ## MVP scope — build in this order
 
-1. Tiny onboarding and add-first-friend (manual + contact picker).
+1. Tiny onboarding and add-first-friend (manual name entry).
 2. Friends: name, optional photo/phone/share method, catch-up rhythm, last-seen date.
 3. When: chronological next 2–3 weeks — availability, plans, friends due for a catch-up.
 4. Availability: recurring presets + one-time; skip occurrence without changing the rule.
