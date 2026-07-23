@@ -314,13 +314,13 @@ startAt: plan.startAt, endAt: plan.endAt }` + a small confirmation
 
 **Acceptance.**
 
-- [ ] Prebuild manifest contains **no** `READ_CALENDAR`/`WRITE_CALENDAR`
+- [x] Prebuild manifest contains **no** `READ_CALENDAR`/`WRITE_CALENDAR`
       (same check-and-clean procedure as WP1).
-- [ ] Unit-test the stale predicate (pure helper, e.g. in
+- [x] Unit-test the stale predicate (pure helper, e.g. in
       `src/domain/model.ts` or the service): unchanged → no hint; moved time →
       hint; cancelled → hint; re-export clears.
-- [ ] Web build hides the row; typecheck/tests green.
-- [ ] Docs: `docs/PLAY_CONSOLE_DECLARATIONS.md` + policy files mention the
+- [x] Web build hides the row; typecheck/tests green.
+- [x] Docs: `docs/PLAY_CONSOLE_DECLARATIONS.md` + policy files mention the
       handoff (no calendar data read).
 
 ## WP7 — Feedback channel + dead-code cleanup

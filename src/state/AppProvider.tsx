@@ -192,6 +192,7 @@ type AppContextValue = {
   confirmInviteSent: (friendId: string, sent: boolean) => Promise<void>;
   markPlanDone: (attendedFriendIds: string[]) => Promise<void>;
   markPlanStatus: (status: PlanStatus) => Promise<void>;
+  setPlanCalendarExport: (snapshot: Plan["calendarExport"]) => Promise<void>;
   openMoveFriend: (friendId: string) => void;
   moveFriendToSlot: (
     slot: ConcreteSlot,
@@ -955,6 +956,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [activePlanId, commit, goWhen],
   );
 
+  const setPlanCalendarExport = useCallback(
+    async (snapshot: Plan["calendarExport"]) => {
+      if (!activePlanId) return;
+      await commit((current) => ({
+        ...current,
+        plans: current.plans.map((plan) =>
+          plan.id === activePlanId
+            ? {
+                ...plan,
+                calendarExport: snapshot,
+                updatedAt: new Date().toISOString(),
+              }
+            : plan,
+        ),
+      }));
+    },
+    [activePlanId, commit],
+  );
+
   const openMoveFriend = useCallback(
     (friendId: string) => {
       setMoveFriendId(friendId);
@@ -1166,6 +1186,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       confirmInviteSent,
       markPlanDone,
       markPlanStatus,
+      setPlanCalendarExport,
       openMoveFriend,
       moveFriendToSlot,
       updateSettings,
@@ -1241,6 +1262,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       confirmInviteSent,
       markPlanDone,
       markPlanStatus,
+      setPlanCalendarExport,
       openMoveFriend,
       moveFriendToSlot,
       updateSettings,

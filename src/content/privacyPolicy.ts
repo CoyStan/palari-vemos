@@ -27,7 +27,7 @@ export const PRIVACY_POLICY_SECTIONS: { title: string; body: string }[] = [
   },
   {
     title: "Sharing invitations",
-    body: "When you share an invitation, the message is opened through the Android share sheet or apps you choose. Delivery after you leave So, When? is controlled by those apps. Opening a share sheet is not treated as proof that a message was sent.",
+    body: "When you share an invitation, the message is opened through the Android share sheet or apps you choose. Delivery after you leave So, When? is controlled by those apps. Opening a share sheet is not treated as proof that a message was sent. You may also hand a plan to your device’s calendar app through the system create-event screen; So, When? does not read your calendars.",
   },
   {
     title: "Export and deletion",

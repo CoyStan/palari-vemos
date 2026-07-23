@@ -36,6 +36,8 @@ Must not appear without justification:
 
 Contacts: not used. Friends are typed manually; do not declare contact data collection. Confirm the final AAB has no `READ_CONTACTS`.
 
+Calendar: one-way OS create-event handoff only (no calendar read). Confirm the final AAB has no `READ_CALENDAR` / `WRITE_CALENDAR`.
+
 ## Content rating / ads
 
 No ads. Friendship organizer for adults. Not directed to children under 13.

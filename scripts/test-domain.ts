@@ -7,6 +7,7 @@ import {
   buildInviteText,
   buildTimeline,
   catchUpStatus,
+  calendarExportHint,
   intervalsOverlap,
   proposePlanWindow,
   rhythmDays,
@@ -478,6 +479,55 @@ const capped = buildReminderSpecs(
   reminderNow,
 );
 assert.ok(capped.length <= 32);
+
+assert.equal(
+  calendarExportHint({
+    status: "on",
+    startAt: plan710.startAt,
+    endAt: plan710.endAt,
+    calendarExport: {
+      exportedAt: now.toISOString(),
+      startAt: plan710.startAt,
+      endAt: plan710.endAt,
+    },
+  }),
+  null,
+);
+assert.equal(
+  calendarExportHint({
+    status: "on",
+    startAt: plan710.startAt,
+    endAt: plan710.endAt,
+    calendarExport: {
+      exportedAt: now.toISOString(),
+      startAt: new Date(2026, 6, 24, 19, 0).toISOString(),
+      endAt: plan710.endAt,
+    },
+  }),
+  "moved",
+);
+assert.equal(
+  calendarExportHint({
+    status: "cancelled",
+    startAt: plan710.startAt,
+    endAt: plan710.endAt,
+    calendarExport: {
+      exportedAt: now.toISOString(),
+      startAt: plan710.startAt,
+      endAt: plan710.endAt,
+    },
+  }),
+  "cancelled",
+);
+assert.equal(
+  calendarExportHint({
+    status: "on",
+    startAt: plan710.startAt,
+    endAt: plan710.endAt,
+    calendarExport: null,
+  }),
+  null,
+);
 
 // Months view aggregation (docs/V1_CONTRACT.md WP4 seed).
 const doneJuly18: Plan = {

@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Image, Pressable, ScrollView, Text, View } from "react-native";
+import {
+  Alert,
+  Image,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import Animated, {
   useAnimatedStyle,
@@ -12,10 +20,12 @@ import { AnimatedDialog } from "../components/AnimatedDialog";
 import { Avatar } from "../components/Avatar";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { Icon } from "../components/Icon";
 import { Screen } from "../components/Screen";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { TextField } from "../components/TextField";
 import {
+  calendarExportHint,
   formatClock,
   INVITE_STATUS_LABELS,
   PLAN_STATUS_LABELS,
@@ -23,6 +33,8 @@ import {
 } from "../domain/model";
 import type { InviteStatus, InviteTone } from "../domain/types";
 import { formatDayHeading } from "../domain/time";
+import { color } from "../foundation";
+import { addPlanToCalendar } from "../services/calendar";
 import { copyIntoOwnedMedia } from "../services/media";
 import { hapticCelebrate, hapticSoft, hapticTick } from "../services/haptics";
 import { useApp } from "../state/AppProvider";
@@ -59,6 +71,7 @@ export function PlanDetailScreen() {
     markPlanDone,
     markPlanStatus,
     savePlanMemory,
+    setPlanCalendarExport,
     openMoveFriend,
   } = useApp();
 
@@ -147,6 +160,25 @@ export function PlanDetailScreen() {
   const attendeeIds = isDone
     ? activePlan.attendedFriendIds
     : planFriends.map((item) => item.friendId);
+  const exportHint = calendarExportHint(activePlan);
+  const showCalendarRow = Platform.OS !== "web" && !isTerminal;
+
+  const onAddToCalendar = async () => {
+    const result = await addPlanToCalendar(activePlan);
+    if (!result.ok) {
+      Alert.alert("Calendar", result.message);
+      return;
+    }
+    await setPlanCalendarExport({
+      exportedAt: new Date().toISOString(),
+      startAt: activePlan.startAt,
+      endAt: activePlan.endAt,
+    });
+    Alert.alert(
+      "Added",
+      "Your calendar app takes it from here. So, When? won’t sync changes later.",
+    );
+  };
 
   const saveDetails = () => {
     void updatePlan({ title, activity, place, note });
@@ -271,6 +303,33 @@ export function PlanDetailScreen() {
   return (
     <Screen contentClassName="gap-5">
       <ScreenHeader title="Plan" onBack={goBack} />
+
+      {exportHint === "moved" ? (
+        <Card className="gap-3 border border-border bg-primary-soft p-4">
+          <Text className="text-body text-ink">
+            This plan moved — update it in your calendar too.
+          </Text>
+          <Button label="Add again" onPress={() => void onAddToCalendar()} />
+          <Button
+            label="Dismiss"
+            variant="ghost"
+            onPress={() => void setPlanCalendarExport(null)}
+          />
+        </Card>
+      ) : null}
+
+      {exportHint === "cancelled" ? (
+        <Card className="gap-3 border border-border bg-canvas p-4">
+          <Text className="text-body text-ink">
+            You cancelled this — remove it from your calendar.
+          </Text>
+          <Button
+            label="Dismiss"
+            variant="ghost"
+            onPress={() => void setPlanCalendarExport(null)}
+          />
+        </Card>
+      ) : null}
 
       <Animated.View style={bloomStyle}>
         <Card elevation="lift" className="gap-3 p-5">
@@ -559,6 +618,19 @@ export function PlanDetailScreen() {
 
       {!isTerminal ? (
         <View className="gap-2">
+          {showCalendarRow ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Add to calendar"
+              onPress={() => void onAddToCalendar()}
+              className="min-h-12 flex-row items-center justify-center gap-2 rounded-full border border-border bg-surface px-4 active:bg-primary-soft"
+            >
+              <Icon name="calendar" size={20} color={color.primary} />
+              <Text className="font-sans-semibold text-body text-primary">
+                Add to calendar
+              </Text>
+            </Pressable>
+          ) : null}
           <Button label="Mark done" onPress={onMarkDonePress} />
           <Button
             label="Cancel plan"
